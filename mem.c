@@ -3,7 +3,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-#define NPAD 31
+#define NPAD 15
 
 struct list {
 	struct list *next;
@@ -42,7 +42,7 @@ static struct list * meminit(size_t size)
 
 #define CLOCK_TYPE CLOCK_THREAD_CPUTIME_ID
 
-uint64_t memtest(size_t size, unsigned iters)
+float memtest(size_t size, unsigned iters)
 {
 	unsigned i;
 	struct timespec ts1, ts2;
@@ -72,28 +72,39 @@ uint64_t memtest(size_t size, unsigned iters)
 
 	free(l);
 
-	return diff(ts1, ts2);
+	return (diff(ts1, ts2)*1.0)/(n*iters);
 }
 
 
 int main(int argc, char **argv, char **arge) 
 {
-	uint64_t time;
+	float time;
 	size_t size;
   	unsigned iters;
+	char unit = 'b';
 
 	(void)arge;
 	if (argc != 3)
 		return 1;
 	
-	if (sscanf(argv[1], "%lu", &size) != 1)
+	if (sscanf(argv[1], "%lu%c", &size, &unit) < 1)
 		return 1;
+
+	switch (unit) {
+		case 'K':
+			size *= 1024;
+			break;
+		case 'M':
+			size *= 1024*1024;
+			break;
+	}
+
 	if (sscanf(argv[2], "%u", &iters) != 1)
 		return 1;
 
 	time = memtest(size, iters);
 
-	printf("size=%lu iters=%u %.2f\n", size, iters, (time*1.0)/iters);
+	printf("stride=%lu size=%lu iters=%u %.2f\n", sizeof(struct list), size, iters, time);
 
 	return 0;
 }

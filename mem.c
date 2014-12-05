@@ -3,7 +3,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-#define NPAD 31
+#define NPAD 15
 
 struct list {
 	struct list *next;
@@ -49,7 +49,7 @@ uint64_t memtest(size_t size, unsigned iters)
 	
 	l = meminit(size);
 
-	if (clock_gettime(CLOCK_REALTIME, &ts1) != 0) {
+	if (clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts1) != 0) {
 		perror("clock_gettime");
 		exit(1);
 	}
@@ -60,7 +60,7 @@ uint64_t memtest(size_t size, unsigned iters)
 		asm volatile ("" :: "r" (p));
 	}
 	
-	if (clock_gettime(CLOCK_REALTIME, &ts2) != 0) {
+	if (clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts2) != 0) {
 		perror("clock_gettime");
 		exit(1);
 	}
@@ -88,7 +88,7 @@ int main(int argc, char **argv, char **arge)
 
 	time = memtest(size, iters);
 
-	printf("size=%lu iters=%u %.2f\n", size, iters, (time*1.0)/iters);
+	printf("stride=%lu size=%lu iters=%u %.2f\n", sizeof(struct list), size, iters, (time*1.0)/iters);
 
 	return 0;
 }

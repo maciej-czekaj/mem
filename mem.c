@@ -40,27 +40,32 @@ static struct list * meminit(size_t size)
 	return l;
 }
 
+#define CLOCK_TYPE CLOCK_THREAD_CPUTIME_ID
 
 uint64_t memtest(size_t size, unsigned iters)
 {
 	unsigned i;
 	struct timespec ts1, ts2;
 	struct list *p,*l;
+	unsigned n = size/sizeof(struct list);
 	
 	l = meminit(size);
 
-	if (clock_gettime(CLOCK_REALTIME, &ts1) != 0) {
+	if (clock_gettime(CLOCK_TYPE, &ts1) != 0) {
 		perror("clock_gettime");
 		exit(1);
 	}
 	
 	p = &l[0];
 	for (i = 0; i < iters; i++) {
-		p = p->next;
-		asm volatile ("" :: "r" (p));
+		unsigned j;
+		for (j = 0; j < n; j++) {
+			p = p->next;
+			asm volatile ("" :: "r" (p));
+		}
 	}
 	
-	if (clock_gettime(CLOCK_REALTIME, &ts2) != 0) {
+	if (clock_gettime(CLOCK_TYPE, &ts2) != 0) {
 		perror("clock_gettime");
 		exit(1);
 	}

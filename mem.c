@@ -39,11 +39,13 @@ void permutation(struct list *l, size_t n)
 
 void dump_list(struct list *l, size_t n)
 {
-	unsigned i;
+	unsigned i, offset;
 
 	for (i = 0; i < n; i++) {
-		printf("%u:%u", i, ((unsigned)(l[i].next - l))/sizeof(struct list));
+		offset = (unsigned)(l[i].next - l);
+		printf("%u:%u ", i, offset);
 	}
+	puts("");
 }
 
 static struct list * meminit(size_t size) 

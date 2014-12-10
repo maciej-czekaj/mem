@@ -24,10 +24,33 @@ uint64_t diff(struct timespec start, struct timespec end)
 	return temp.tv_sec * 1000000000 + temp.tv_nsec;
 }
 
+void permutation(struct list *l, size_t n)
+{
+	int i,k;
+	struct list tmp;
+
+	for (k = n-1; k > 1; --k) {
+		i = rand() % k;
+		tmp = l[i];
+		l[i] = l[k];
+		l[k] = tmp;
+	}
+}
+
+void dump_list(struct list *l, size_t n)
+{
+	unsigned i;
+
+	for (i = 0; i < n; i++) {
+		printf("%u:%u", i, ((unsigned)(l[i].next - l))/sizeof(struct list));
+	}
+}
+
 static struct list * meminit(size_t size) 
 {
 	unsigned i;
 	unsigned n = size/sizeof(struct list);
+
 	struct list *l = malloc(size);
 
 	if (l == NULL) {
@@ -49,7 +72,10 @@ float memtest(size_t size, unsigned iters)
 	struct list *p,*l;
 	unsigned n = size/sizeof(struct list);
 	
+	iters = 100000000 / n;
+
 	l = meminit(size);
+	permutation(l, n);
 
 	if (clock_gettime(CLOCK_TYPE, &ts1) != 0) {
 		perror("clock_gettime");
@@ -84,7 +110,7 @@ int main(int argc, char **argv, char **arge)
 	char unit = 'b';
 
 	(void)arge;
-	if (argc != 3)
+	if (argc < 2)
 		return 1;
 	
 	if (sscanf(argv[1], "%lu%c", &size, &unit) < 1)
@@ -99,12 +125,12 @@ int main(int argc, char **argv, char **arge)
 			break;
 	}
 
-	if (sscanf(argv[2], "%u", &iters) != 1)
+	if (argc > 2 && sscanf(argv[2], "%u", &iters) != 1)
 		return 1;
 
 	time = memtest(size, iters);
 
-	printf("stride=%lu size=%lu iters=%u %.2f\n", sizeof(struct list), size, iters, time);
+	printf("stride=%lu size=%lu %.2f\n", sizeof(struct list), size, time);
 
 	return 0;
 }

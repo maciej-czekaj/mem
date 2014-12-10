@@ -20,6 +20,7 @@ uint64_t diff(struct timespec start, struct timespec end)
 	return ts2scalar(end) - ts2scalar(start);
 }
 
+
 void permutation(struct list *l, size_t n)
 {
 	int i,k;
@@ -67,20 +68,23 @@ static struct list * meminit(size_t size)
 //CLOCK_REALTIME 
 //CLOCK_THREAD_CPUTIME_ID
 
-float memtest(size_t size, unsigned iters)
+float memtest(size_t size, unsigned *refs)
 {
-	unsigned i;
+	unsigned i, iters;
 	struct timespec ts1, ts2;
 	struct list *p,*l;
 	unsigned n = size/sizeof(struct list);
-	
-	iters = 1000;
-	if ((iters * n) > 10000000)
-		iters = 10000000/n;
-	
+
+/*
+	iters = 100000000;
+	if ((iters * n) > 100000000)
+*/
+		iters = 100000000/n;
+	*refs = iters*n;
 
 	l = meminit(size);
 	permutation(l, n);
+	//dump_list(l, n);
 
 	if (clock_gettime(CLOCK_TYPE, &ts1) != 0) {
 		perror("clock_gettime");
@@ -111,7 +115,7 @@ int main(int argc, char **argv, char **arge)
 {
 	float time;
 	size_t size;
-  	unsigned iters;
+  	unsigned refs;
 	char unit = 'b';
 	struct timespec res;
 
@@ -131,17 +135,14 @@ int main(int argc, char **argv, char **arge)
 			break;
 	}
 
-	if (argc > 2 && sscanf(argv[2], "%u", &iters) != 1)
-		return 1;
-
 	if (clock_getres(CLOCK_TYPE, &res)) {
 		perror("clock_gettime");
 		return(1);
 	}
 
-	time = memtest(size, iters);
+	time = memtest(size, &refs);
 
-	printf("stride=%lu res=%lu size=%lu %.2f\n", sizeof(struct list), res.tv_nsec, size, time);
+	printf("stride=%lu res=%lu size=%lu refs=%u time=%.2f\n", sizeof(struct list), res.tv_nsec, size, refs, time);
 
 	return 0;
 }

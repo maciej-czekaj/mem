@@ -2,6 +2,7 @@
 #include <time.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <sys/mman.h>
 
 #define NPAD 15
 
@@ -62,13 +63,20 @@ static struct list * meminit(size_t size)
 {
 	unsigned i;
 	unsigned n = size/sizeof(struct list);
+	struct list *l;
 
-	struct list *l = malloc(size);
+	l = mmap(NULL, size, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0); 
 
 	if (l == NULL) {
-		perror("malloc");
+		perror("mmap");
 		exit(1);
 	}
+
+	if (madvise(l, size, MADV_NOHUGEPAGE)) {
+		perror("madvice");
+		exit(1);
+	}
+
 	for (i = 0; i < n-1; i++)
 		l[i+1].next = &l[i];
 	l[0].next = &l[n-1];
@@ -94,6 +102,8 @@ float memtest(size_t size, unsigned *refs)
 	if ((iters * n) > 100000000)
 */
 	iters = 10*1000*1000/n;
+	if (iters == 0)
+		iters = 10;
 	*refs = iters*n;
 
 	l = meminit(size);
@@ -120,8 +130,6 @@ float memtest(size_t size, unsigned *refs)
 		perror("clock_gettime");
 		exit(1);
 	}
-
-	free(l);
 
 	return (diff(ts1, ts2)*1.0)/(n*iters);
 }

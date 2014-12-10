@@ -34,6 +34,19 @@ void permutation(struct list *l, size_t n)
 	}
 }
 
+void permutation2(struct list *l, size_t n)
+{
+	unsigned i,k;
+	struct list tmp;
+
+	for (k = 0; k < (n / 2); ++k) {
+		i = n - k - 1;
+		tmp = l[i];
+		l[i] = l[k];
+		l[k] = tmp;
+	}
+}
+
 void dump_list(struct list *l, size_t n)
 {
 	unsigned i, offset;
@@ -68,6 +81,7 @@ static struct list * meminit(size_t size)
 //CLOCK_REALTIME 
 //CLOCK_THREAD_CPUTIME_ID
 
+
 float memtest(size_t size, unsigned *refs)
 {
 	unsigned i, iters;
@@ -79,10 +93,12 @@ float memtest(size_t size, unsigned *refs)
 	iters = 100000000;
 	if ((iters * n) > 100000000)
 */
-		iters = 100000000/n;
+	iters = 10*1000*1000/n;
 	*refs = iters*n;
 
 	l = meminit(size);
+	permutation(l, n);
+	//permutation2(l, n);
 	permutation(l, n);
 	//dump_list(l, n);
 
@@ -142,7 +158,8 @@ int main(int argc, char **argv, char **arge)
 
 	time = memtest(size, &refs);
 
-	printf("stride=%lu res=%lu size=%lu refs=%u time=%.2f\n", sizeof(struct list), res.tv_nsec, size, refs, time);
+	//printf("stride = %lu res = %lu size = %lu refs = %u time = %.2f\n", sizeof(struct list), res.tv_nsec, size, refs, time);
+	printf("%lu %.2f\n", size, time);
 
 	return 0;
 }

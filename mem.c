@@ -10,18 +10,14 @@ struct list {
 	long pad[NPAD];
 };
 
+static uint64_t ts2scalar(struct timespec ts)
+{
+	return ts.tv_sec * 1000000000 + ts.tv_nsec;
+}
+
 uint64_t diff(struct timespec start, struct timespec end)
 {
-	struct timespec temp;
-	if ((end.tv_nsec-start.tv_nsec)<0) {
-		temp.tv_sec = end.tv_sec-start.tv_sec-1;
-		temp.tv_nsec = 1000000000+end.tv_nsec-start.tv_nsec;
-	} else {
-		temp.tv_sec = end.tv_sec-start.tv_sec;
-		temp.tv_nsec = end.tv_nsec-start.tv_nsec;
-	}
-
-	return temp.tv_sec * 1000000000 + temp.tv_nsec;
+	return ts2scalar(end) - ts2scalar(start);
 }
 
 void permutation(struct list *l, size_t n)
@@ -65,7 +61,11 @@ static struct list * meminit(size_t size)
 	return l;
 }
 
-#define CLOCK_TYPE CLOCK_THREAD_CPUTIME_ID
+#define CLOCK_TYPE CLOCK_MONOTONIC_RAW
+//CLOCK_THREAD_CPUTIME_ID
+//CLOCK_MONOTONIC
+//CLOCK_REALTIME 
+//CLOCK_THREAD_CPUTIME_ID
 
 float memtest(size_t size, unsigned iters)
 {
@@ -74,7 +74,10 @@ float memtest(size_t size, unsigned iters)
 	struct list *p,*l;
 	unsigned n = size/sizeof(struct list);
 	
-	iters = 100000000 / n;
+	iters = 1000;
+	if ((iters * n) > 10000000)
+		iters = 10000000/n;
+	
 
 	l = meminit(size);
 	permutation(l, n);
@@ -110,6 +113,7 @@ int main(int argc, char **argv, char **arge)
 	size_t size;
   	unsigned iters;
 	char unit = 'b';
+	struct timespec res;
 
 	(void)arge;
 	if (argc < 2)
@@ -119,20 +123,25 @@ int main(int argc, char **argv, char **arge)
 		return 1;
 
 	switch (unit) {
-		case 'K':
-			size *= 1024;
+		case 'k':
+			size <<= 10;
 			break;
-		case 'M':
-			size *= 1024*1024;
+		case 'm':
+			size <<= 20;
 			break;
 	}
 
 	if (argc > 2 && sscanf(argv[2], "%u", &iters) != 1)
 		return 1;
 
+	if (clock_getres(CLOCK_TYPE, &res)) {
+		perror("clock_gettime");
+		return(1);
+	}
+
 	time = memtest(size, iters);
 
-	printf("stride=%lu size=%lu %.2f\n", sizeof(struct list), size, time);
+	printf("stride=%lu res=%lu size=%lu %.2f\n", sizeof(struct list), res.tv_nsec, size, time);
 
 	return 0;
 }

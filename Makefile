@@ -1,5 +1,10 @@
 CC=gcc
-CFLAGS=-O3 -g -Wall -Wextra -Werror
+CFLAGS=-g -Wall -Wextra -Werror
+ifeq ($(DEBUG),1)
+ CFLAGS+=-O0
+else
+ CFLAGS+=-O3
+endif
 #LDFLAGS=-lrt
 
 all: mem

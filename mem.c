@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <sys/mman.h>
+#include <string.h>
 
 #define NPAD 15
 
@@ -63,7 +64,7 @@ void permutation(unsigned *l, size_t n)
 	}
 }
 
-static struct list * meminit(size_t size) 
+static struct list * meminit(size_t size, int shuffle) 
 {
 	unsigned i;
 	unsigned n = size/sizeof(struct list);
@@ -88,7 +89,8 @@ static struct list * meminit(size_t size)
 		words[i] = n-i-1;
 	words[0] = n-1;
 
-	permutation(words, n-1);
+	if (shuffle)
+		permutation(words, n-1);
 	
 #ifdef DEBUG
 	for (i=0;i<n;i++)
@@ -106,6 +108,9 @@ static struct list * meminit(size_t size)
 
 	free(words);
 
+#ifdef TEST
+	trace_list(l, n);
+#endif
 	return l;
 }
 
@@ -116,7 +121,7 @@ static struct list * meminit(size_t size)
 //CLOCK_THREAD_CPUTIME_ID
 
 
-float memtest(size_t size, unsigned *refs)
+float memtest(size_t size, int shuffle, unsigned *refs)
 {
 	unsigned i, iters;
 	struct timespec ts1, ts2;
@@ -128,10 +133,8 @@ float memtest(size_t size, unsigned *refs)
 		iters = 10;
 	*refs = iters*n;
 
-	l = meminit(size);
-#ifdef TEST
-	trace_list(l, n);
-#endif
+	l = meminit(size, shuffle);
+
 	if (clock_gettime(CLOCK_TYPE, &ts1) != 0) {
 		perror("clock_gettime");
 		exit(1);
@@ -162,6 +165,7 @@ int main(int argc, char **argv, char **arge)
   	unsigned refs;
 	char unit = 'b';
 	struct timespec res;
+	int shuffle = 1;
 
 	(void)arge;
 	if (argc < 2)
@@ -179,12 +183,15 @@ int main(int argc, char **argv, char **arge)
 			break;
 	}
 
+	if (argc > 2 && strcmp(argv[2],"-l") == 0)
+		shuffle = 0;
+
 	if (clock_getres(CLOCK_TYPE, &res)) {
 		perror("clock_gettime");
 		return(1);
 	}
 
-	time = memtest(size, &refs);
+	time = memtest(size, shuffle, &refs);
 
 	//printf("stride = %lu res = %lu size = %lu refs = %u time = %.2f\n", sizeof(struct list), res.tv_nsec, size, refs, time);
 	printf("%lu %.2f\n", size, time);

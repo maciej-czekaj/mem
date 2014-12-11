@@ -22,7 +22,7 @@ uint64_t diff(struct timespec start, struct timespec end)
 }
 
 
-
+#if defined(DEBUG) || defined(TEST)
 void dump_list(struct list *l, size_t n)
 {
 	unsigned i, offset;
@@ -48,6 +48,7 @@ void trace_list(struct list *l, size_t n)
 	}
 	puts("");
 }
+#endif
 
 void permutation(unsigned *l, size_t n)
 {

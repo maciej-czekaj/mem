@@ -130,7 +130,7 @@ float memtest(size_t size, int shuffle, unsigned *refs)
 
 	iters = 10*1000*1000/n;
 	if (iters == 0)
-		iters = 10;
+		iters = 5;
 	*refs = iters*n;
 
 	l = meminit(size, shuffle);

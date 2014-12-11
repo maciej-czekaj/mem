@@ -22,31 +22,6 @@ uint64_t diff(struct timespec start, struct timespec end)
 }
 
 
-void permutation(struct list *l, size_t n)
-{
-	int i,k;
-	struct list tmp;
-
-	for (k = n-1; k > 1; --k) {
-		i = rand() % k;
-		tmp = l[i];
-		l[i] = l[k];
-		l[k] = tmp;
-	}
-}
-
-void permutation2(struct list *l, size_t n)
-{
-	unsigned i,k;
-	struct list tmp;
-
-	for (k = 0; k < (n / 2); ++k) {
-		i = n - k - 1;
-		tmp = l[i];
-		l[i] = l[k];
-		l[k] = tmp;
-	}
-}
 
 void dump_list(struct list *l, size_t n)
 {
@@ -59,11 +34,40 @@ void dump_list(struct list *l, size_t n)
 	puts("");
 }
 
+void trace_list(struct list *l, size_t n)
+{
+	unsigned i;
+	int offset;
+	struct list *p = l;
+
+	printf("n = %lu\n", n);
+	for (i = 0; i < n; i++) {
+		offset = (int)(p -l);
+		printf("%i ", offset);
+		p = p->next;
+	}
+	puts("");
+}
+
+void permutation(unsigned *l, size_t n)
+{
+	int i,k;
+	unsigned tmp;
+	
+	for (k = n-1; k > 1; k--) {
+		i = rand() % k;
+		tmp = l[i];
+		l[i] = l[k];
+		l[k] = tmp;
+	}
+}
+
 static struct list * meminit(size_t size) 
 {
 	unsigned i;
 	unsigned n = size/sizeof(struct list);
-	struct list *l;
+	struct list *l, *p;
+	unsigned *words;
 
 	l = mmap(NULL, size, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0); 
 
@@ -77,9 +81,30 @@ static struct list * meminit(size_t size)
 		exit(1);
 	}
 
-	for (i = 0; i < n-1; i++)
-		l[i+1].next = &l[i];
-	l[0].next = &l[n-1];
+	words = malloc((n+1)*sizeof(*words));
+
+	for (i=1; i<n; i++)
+		words[i] = n-i-1;
+	words[0] = n-1;
+
+	permutation(words, n-1);
+	
+#ifdef DEBUG
+	for (i=0;i<n;i++)
+		printf("%u ", words[i]);
+	puts("");
+#endif
+	p = l;
+	for (i = 0; i < n; i++) {
+		p->next = &l[words[i]];
+#ifdef DEBUG
+		printf("%p %p %u\n", p, p->next, words[i]);
+#endif
+		p = p->next;
+	}
+
+	free(words);
+
 	return l;
 }
 
@@ -97,21 +122,15 @@ float memtest(size_t size, unsigned *refs)
 	struct list *p,*l;
 	unsigned n = size/sizeof(struct list);
 
-/*
-	iters = 100000000;
-	if ((iters * n) > 100000000)
-*/
 	iters = 10*1000*1000/n;
 	if (iters == 0)
 		iters = 10;
 	*refs = iters*n;
 
 	l = meminit(size);
-	permutation(l, n);
-	//permutation2(l, n);
-	permutation(l, n);
-	//dump_list(l, n);
-
+#ifdef TEST
+	trace_list(l, n);
+#endif
 	if (clock_gettime(CLOCK_TYPE, &ts1) != 0) {
 		perror("clock_gettime");
 		exit(1);

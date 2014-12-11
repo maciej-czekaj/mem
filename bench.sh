@@ -1,4 +1,5 @@
-file=${1:=res.txt}
+#!/bin/bash
+file=${1:-res.txt}
 for i in {0..20}
 	do
 	taskset 1 ./mem $(( (1024<<i) )) | awk '{printf "%.1f %s\n", $1/1024, $2}'

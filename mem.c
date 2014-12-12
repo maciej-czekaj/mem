@@ -5,55 +5,30 @@
 #include <sys/mman.h>
 #include <string.h>
 
+#define max(a,b) ((a) > (b) ? (a) : (b))
+
 struct list {
 	struct list *next;
 	long pad[0];
 };
 
-static uint64_t ts2scalar(struct timespec ts)
+#define CLOCK_TYPE CLOCK_MONOTONIC_RAW
+
+uint64_t getclock()
 {
+	struct timespec ts;
+	if (clock_gettime(CLOCK_TYPE, &ts) != 0) {
+		perror("clock_gettime");
+		exit(1);
+	}
 	return ts.tv_sec * 1000000000 + ts.tv_nsec;
 }
-
-uint64_t diff(struct timespec start, struct timespec end)
-{
-	return ts2scalar(end) - ts2scalar(start);
-}
-
-
-#if defined(DEBUG) || defined(TEST)
-void dump_list(struct list *l, size_t n)
-{
-	unsigned i, offset;
-
-	for (i = 0; i < n; i++) {
-		offset = (unsigned)(l[i].next - l);
-		printf("%u:%u ", i, offset);
-	}
-	puts("");
-}
-
-void trace_list(struct list *l, size_t n)
-{
-	unsigned i;
-	int offset;
-	struct list *p = l;
-
-	printf("n = %lu\n", n);
-	for (i = 0; i < n; i++) {
-		offset = (int)(p -l);
-		printf("%i ", offset);
-		p = p->next;
-	}
-	puts("");
-}
-#endif
 
 void permutation(unsigned *l, size_t n)
 {
 	int i,k;
 	unsigned tmp;
-	
+
 	for (k = n-1; k > 1; k--) {
 		i = rand() % k;
 		tmp = l[i];
@@ -90,82 +65,58 @@ static struct list * meminit(size_t size, size_t line, int shuffle)
 
 	if (shuffle)
 		permutation(words, n-1);
-	
-#ifdef DEBUG
-	for (i=0;i<n;i++)
-		printf("%u ", words[i]);
-	puts("");
-#endif
+
 	p = (struct list *)l;
 	for (i = 0; i < n; i++) {
 		p->next = (struct list *)&l[words[i]*line];
-#ifdef DEBUG
-		printf("%p %p %u\n", p, p->next, words[i]);
-#endif
 		p = p->next;
 	}
 
 	free(words);
 
-#ifdef TEST
-	trace_list(l, n);
-#endif
 	return (struct list *)l;
 }
 
-#define CLOCK_TYPE CLOCK_MONOTONIC_RAW
-//CLOCK_THREAD_CPUTIME_ID
-//CLOCK_MONOTONIC
-//CLOCK_REALTIME 
-//CLOCK_THREAD_CPUTIME_ID
+void benchmark(struct list *l, unsigned iters)
+{
+	while (iters--) {
+			l = l->next;
+	}
 
+	asm volatile ("" :: "r" (l));
+}
 
 float memtest(size_t size, size_t line, int shuffle)
 {
-	unsigned i, iters;
-	struct timespec ts1, ts2;
-	struct list *p,*l;
+	unsigned iters;
+	uint64_t t1,t2;
+	struct list *l;
 	unsigned n = size/sizeof(struct list);
 
-	iters = 10*1000*1000/n;
-	iters = iters < 1 ? 1 : iters;
+	iters = max(10*1000*1000, n);
 
 	l = meminit(size, line, shuffle);
 
-	if (clock_gettime(CLOCK_TYPE, &ts1) != 0) {
-		perror("clock_gettime");
-		exit(1);
-	}
-	
-	p = l;
-	for (i = 0; i < iters; i++) {
-		unsigned j;
-		for (j = 0; j < n; j++) {
-			p = p->next;
-			asm volatile ("" :: "r" (p));
-		}
-	}
-	
-	if (clock_gettime(CLOCK_TYPE, &ts2) != 0) {
-		perror("clock_gettime");
-		exit(1);
-	}
+	t1 = getclock();
 
-	return (diff(ts1, ts2)*1.0)/(n*iters);
+	benchmark(l, iters);
+
+	t2 = getclock();
+
+	return ((t2-t1)*1.0)/(iters);
 }
 
 
-int main(int argc, char **argv, char **arge) 
+int main(int argc, char **argv) 
 {
 	float time;
 	size_t size, line;
 	char unit = 'b';
 	int shuffle = 1;
 
-	(void)arge;
 	if (argc < 3)
 		return 1;
-	
+
 	if (sscanf(argv[1], "%lu%c", &size, &unit) < 1)
 		return 1;
 

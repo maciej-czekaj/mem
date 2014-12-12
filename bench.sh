@@ -1,9 +1,17 @@
 #!/bin/bash
 file=${1:-res.txt}
-for i in {0..20}
+
+stride=${2:-128}
+
+
+function run {
+	taskset 1 ./mem $1 $2 $3 | awk '{printf "%.1f %s\n", $1/1024, $2}'
+}
+
+for i in {0..18}
 	do
-	taskset 1 ./mem $(( (1024<<i) )) | awk '{printf "%.1f %s\n", $1/1024, $2}'
-	taskset 1 ./mem $(( ( (1024<<i) * 5) / 4 )) | awk '{printf "%.1f %s\n", $1/1024, $2}'
-	taskset 1 ./mem $(( ( (1024<<i) * 7) / 4 )) | awk '{printf "%.1f %s\n", $1/1024, $2}'
+	run $(( (1024<<i) )) $stride $3
+	run $(( ( (1024<<i) * 5) / 4 )) $stride $3
+	run $(( ( (1024<<i) * 7) / 4 )) $stride $3
 	done | tee $file
 

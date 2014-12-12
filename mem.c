@@ -5,11 +5,9 @@
 #include <sys/mman.h>
 #include <string.h>
 
-#define NPAD 15
-
 struct list {
 	struct list *next;
-	long pad[NPAD];
+	long pad[0];
 };
 
 static uint64_t ts2scalar(struct timespec ts)
@@ -64,11 +62,12 @@ void permutation(unsigned *l, size_t n)
 	}
 }
 
-static struct list * meminit(size_t size, int shuffle) 
+static struct list * meminit(size_t size, size_t line, int shuffle) 
 {
 	unsigned i;
-	unsigned n = size/sizeof(struct list);
-	struct list *l, *p;
+	unsigned n = size/line;
+	struct list *p;
+	char *l;
 	unsigned *words;
 
 	l = mmap(NULL, size, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0); 
@@ -97,9 +96,9 @@ static struct list * meminit(size_t size, int shuffle)
 		printf("%u ", words[i]);
 	puts("");
 #endif
-	p = l;
+	p = (struct list *)l;
 	for (i = 0; i < n; i++) {
-		p->next = &l[words[i]];
+		p->next = (struct list *)&l[words[i]*line];
 #ifdef DEBUG
 		printf("%p %p %u\n", p, p->next, words[i]);
 #endif
@@ -111,7 +110,7 @@ static struct list * meminit(size_t size, int shuffle)
 #ifdef TEST
 	trace_list(l, n);
 #endif
-	return l;
+	return (struct list *)l;
 }
 
 #define CLOCK_TYPE CLOCK_MONOTONIC_RAW
@@ -121,7 +120,7 @@ static struct list * meminit(size_t size, int shuffle)
 //CLOCK_THREAD_CPUTIME_ID
 
 
-float memtest(size_t size, int shuffle, unsigned *refs)
+float memtest(size_t size, size_t line, int shuffle)
 {
 	unsigned i, iters;
 	struct timespec ts1, ts2;
@@ -129,18 +128,16 @@ float memtest(size_t size, int shuffle, unsigned *refs)
 	unsigned n = size/sizeof(struct list);
 
 	iters = 10*1000*1000/n;
-	if (iters == 0)
-		iters = 5;
-	*refs = iters*n;
+	iters = iters < 1 ? 1 : iters;
 
-	l = meminit(size, shuffle);
+	l = meminit(size, line, shuffle);
 
 	if (clock_gettime(CLOCK_TYPE, &ts1) != 0) {
 		perror("clock_gettime");
 		exit(1);
 	}
 	
-	p = &l[0];
+	p = l;
 	for (i = 0; i < iters; i++) {
 		unsigned j;
 		for (j = 0; j < n; j++) {
@@ -161,14 +158,12 @@ float memtest(size_t size, int shuffle, unsigned *refs)
 int main(int argc, char **argv, char **arge) 
 {
 	float time;
-	size_t size;
-  	unsigned refs;
+	size_t size, line;
 	char unit = 'b';
-	struct timespec res;
 	int shuffle = 1;
 
 	(void)arge;
-	if (argc < 2)
+	if (argc < 3)
 		return 1;
 	
 	if (sscanf(argv[1], "%lu%c", &size, &unit) < 1)
@@ -183,17 +178,14 @@ int main(int argc, char **argv, char **arge)
 			break;
 	}
 
-	if (argc > 2 && strcmp(argv[2],"-l") == 0)
+	if (sscanf(argv[2], "%lu", &line) < 1)
+		return 1;
+
+	if (argc > 3 && strcmp(argv[3],"-l") == 0)
 		shuffle = 0;
 
-	if (clock_getres(CLOCK_TYPE, &res)) {
-		perror("clock_gettime");
-		return(1);
-	}
+	time = memtest(size, line, shuffle);
 
-	time = memtest(size, shuffle, &refs);
-
-	//printf("stride = %lu res = %lu size = %lu refs = %u time = %.2f\n", sizeof(struct list), res.tv_nsec, size, refs, time);
 	printf("%lu %.2f\n", size, time);
 
 	return 0;

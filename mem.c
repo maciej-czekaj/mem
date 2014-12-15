@@ -180,12 +180,12 @@ int main(int argc, char **argv)
 			break;
 	}
 
-	if (size < 1024 || line < 8)
-		return 1;
-
 	if (sscanf(argv[2], "%lu", &line) < 1)
 		return 1;
 
+	if (size < line || line < 8)
+		return 1;
+	
 	if (argc > 3 && strcmp(argv[3],"-l") == 0) {
 		shuffle = 0;
 	}

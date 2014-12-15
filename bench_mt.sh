@@ -1,7 +1,9 @@
 #!/bin/bash
 
-for i in {1..8}
+i=1
+while [ $i -le $2 ]
 	do
-	./bench.sh ${1}_${i} 128 $i 
-	done | tee $file
+	./bench.sh ${1}_${i} 64 $i -w
+	i=$((i+1))
+	done
 

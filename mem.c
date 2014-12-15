@@ -23,6 +23,7 @@ static pthread_barrier_t barrier;
 static struct list *list;
 static unsigned iterations;
 static float times[MAXTHREADS];
+static int write;
 
 uint64_t getclock()
 {
@@ -93,7 +94,9 @@ void benchmark(void)
 	unsigned iters = iterations;
 
 	while (iters--) {
-			l = l->next;
+		if (write)
+			l->pad[0] += 1;
+		l = l->next;
 	}
 
 	asm volatile ("" :: "r" (l));
@@ -124,7 +127,7 @@ float memtest(size_t size, size_t line, int shuffle, unsigned nthreads)
 	pthread_attr_t attr;
 	cpu_set_t c;
 
-	iterations = max(N, n);
+	iterations = max(N, 2*n);
 
 	list = meminit(size, line, shuffle);
 	pthread_barrier_init(&barrier, NULL, nthreads);
@@ -190,6 +193,10 @@ int main(int argc, char **argv)
 	}
 	else {
 		return 1;
+	}
+
+	if (argc > 4 && strcmp(argv[4],"-w") == 0) {
+		write = 1;
 	}
 
 	time = memtest(size, line, shuffle, nthreads);

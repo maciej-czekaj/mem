@@ -182,10 +182,15 @@ int main(int argc, char **argv)
 	if (sscanf(argv[2], "%lu", &line) < 1)
 		return 1;
 
-	if (argc > 3 && strcmp(argv[3],"-l") == 0)
+	if (argc > 3 && strcmp(argv[3],"-l") == 0) {
 		shuffle = 0;
-	else if (argc > 3 && sscanf(argv[3],"%u", &nthreads) != 1)
+	}
+	else if (argc > 3 && sscanf(argv[3],"%u", &nthreads) == 1) {
+		shuffle = 0;
+	}
+	else {
 		return 1;
+	}
 
 	time = memtest(size, line, shuffle, nthreads);
 

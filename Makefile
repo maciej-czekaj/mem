@@ -10,12 +10,13 @@ ifeq ($(TEST),1)
  CFLAGS+=-DTEST
 endif
 
+LDLIBS=-lrt -lpthread
+
 all: mem threads
 
 mem: mem.o
 
 threads: threads.o
-	$(CC) -o $@ $< -lpthread
 
 clean:
 	rm -f mem mem.o threads threads.o

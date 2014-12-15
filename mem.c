@@ -191,9 +191,6 @@ int main(int argc, char **argv)
 	else if (argc > 3 && sscanf(argv[3],"%u", &nthreads) == 1) {
 		shuffle = 0;
 	}
-	else {
-		return 1;
-	}
 
 	if (argc > 4 && strcmp(argv[4],"-w") == 0) {
 		write = 1;

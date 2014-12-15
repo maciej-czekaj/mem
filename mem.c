@@ -1,9 +1,12 @@
+#define _GNU_SOURCE
 #include <stdio.h>
 #include <time.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <sys/mman.h>
 #include <string.h>
+#include <pthread.h>
+#include <sched.h>
 
 #define max(a,b) ((a) > (b) ? (a) : (b))
 
@@ -13,6 +16,13 @@ struct list {
 };
 
 #define CLOCK_TYPE CLOCK_MONOTONIC_RAW
+#define N (10*1000*1000)
+#define MAXTHREADS 16
+
+static pthread_barrier_t barrier;
+static struct list *list;
+static unsigned iterations;
+static float times[MAXTHREADS];
 
 uint64_t getclock()
 {
@@ -77,8 +87,11 @@ static struct list * meminit(size_t size, size_t line, int shuffle)
 	return (struct list *)l;
 }
 
-void benchmark(struct list *l, unsigned iters)
+void benchmark(void)
 {
+	struct list *l = list;
+	unsigned iters = iterations;
+
 	while (iters--) {
 			l = l->next;
 	}
@@ -86,24 +99,57 @@ void benchmark(struct list *l, unsigned iters)
 	asm volatile ("" :: "r" (l));
 }
 
-float memtest(size_t size, size_t line, int shuffle)
+void *thread(void *arg)
 {
-	unsigned iters;
-	uint64_t t1,t2;
-	struct list *l;
-	unsigned n = size/sizeof(struct list);
+	uint64_t t1, t2;
+	long id = (long )arg;
 
-	iters = max(10*1000*1000, n);
-
-	l = meminit(size, line, shuffle);
-
+	pthread_barrier_wait(&barrier);
 	t1 = getclock();
 
-	benchmark(l, iters);
+	benchmark();
 
 	t2 = getclock();
 
-	return ((t2-t1)*1.0)/(iters);
+	times[id] = ((t2-t1)*1.0)/iterations;
+
+	return NULL;
+}
+
+float memtest(size_t size, size_t line, int shuffle, unsigned nthreads)
+{
+	unsigned n = size/line;
+	unsigned i;
+	pthread_t threads[nthreads];
+	pthread_attr_t attr;
+	cpu_set_t c;
+
+	iterations = max(N, n);
+
+	list = meminit(size, line, shuffle);
+	pthread_barrier_init(&barrier, NULL, nthreads);
+	pthread_attr_init(&attr);
+
+	for (i = 1; i < nthreads; i++) {
+		CPU_ZERO(&c);
+		CPU_SET(i, &c);
+		pthread_attr_setaffinity_np(&attr, sizeof(c), &c);
+		pthread_create(&threads[i], &attr, thread, (void *)(long)i);
+	}
+
+	CPU_ZERO(&c);
+	CPU_SET(0, &c);
+	pthread_setaffinity_np(pthread_self(), sizeof(c), &c);
+
+	thread((long)0);
+
+	//printf("%.2f\n", times[0]);
+	for (i = 1; i < nthreads; i++) {
+		pthread_join(threads[i], NULL);
+		//printf("%.2f\n", times[i]);
+	}
+
+	return times[0];
 }
 
 
@@ -113,6 +159,7 @@ int main(int argc, char **argv)
 	size_t size, line;
 	char unit = 'b';
 	int shuffle = 1;
+	unsigned nthreads = 1;
 
 	if (argc < 3)
 		return 1;
@@ -129,13 +176,18 @@ int main(int argc, char **argv)
 			break;
 	}
 
+	if (size < 1024 || line < 8)
+		return 1;
+
 	if (sscanf(argv[2], "%lu", &line) < 1)
 		return 1;
 
 	if (argc > 3 && strcmp(argv[3],"-l") == 0)
 		shuffle = 0;
+	else if (argc > 3 && sscanf(argv[3],"%u", &nthreads) != 1)
+		return 1;
 
-	time = memtest(size, line, shuffle);
+	time = memtest(size, line, shuffle, nthreads);
 
 	printf("%lu %.2f\n", size, time);
 

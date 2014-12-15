@@ -88,14 +88,15 @@ static struct list * meminit(size_t size, size_t line, int shuffle)
 	return (struct list *)l;
 }
 
-void benchmark(void)
+void benchmark(long id)
 {
 	struct list *l = list;
 	unsigned iters = iterations;
+	int w = write;
 
 	while (iters--) {
-		if (write)
-			l->pad[0] += 1;
+		if (w)
+			l->pad[id] += 1;
 		l = l->next;
 	}
 
@@ -110,7 +111,7 @@ void *thread(void *arg)
 	pthread_barrier_wait(&barrier);
 	t1 = getclock();
 
-	benchmark();
+	benchmark(id);
 
 	t2 = getclock();
 

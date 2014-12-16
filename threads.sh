@@ -1,8 +1,11 @@
-./threads 8 v
+./threads 16 v
 ./threads 64 v
 
-./threads 8 s
+./threads 16 a
+./threads 64 a
+
+./threads 16 s
 ./threads 64 s
 
-./threads 8 r
+./threads 16 r
 ./threads 64 r

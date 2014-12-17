@@ -17,7 +17,7 @@ uint64_t getclock()
 		perror("clock_gettime");
 		exit(1);
 	}
-	return ts.tv_sec * 1000000000 + ts.tv_nsec;
+	return (uint64_t)ts.tv_sec * 1000000000 + ts.tv_nsec;
 }
 
 #define N (500*1000*1000)

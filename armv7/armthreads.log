@@ -1,0 +1,144 @@
+9.08
+9.08
+
+ Performance counter stats for 'taskset 1 ./threads 16 v':
+
+        3001694627 cache-references                                            
+          95120670 cache-misses              #    3.169 % of all cache refs    
+             39843 L1-dcache-load-misses     #    0.00% of all L1-dcache hits  
+   <not supported> L1-dcache-prefetch-misses
+        2001135744 L1-dcache-loads                                             
+          95417939 LLC-loads                                                   
+   <not supported> LLC-prefetches          
+   <not supported> dTLB-loads              
+             81520 dTLB-load-misses          #    0.00% of all dTLB cache hits 
+               297 page-faults                                                 
+
+       4.584993492 seconds time elapsed
+
+5.04
+5.06
+
+ Performance counter stats for 'taskset 1 ./threads 64 v':
+
+        3001251826 cache-references                                            
+             31324 cache-misses              #    0.001 % of all cache refs    
+             25195 L1-dcache-load-misses     #    0.00% of all L1-dcache hits  
+   <not supported> L1-dcache-prefetch-misses
+        2000836484 L1-dcache-loads                                             
+            224971 LLC-loads                                                   
+   <not supported> LLC-prefetches          
+   <not supported> dTLB-loads              
+             60000 dTLB-load-misses          #    0.00% of all dTLB cache hits 
+               298 page-faults                                                 
+
+       2.531606256 seconds time elapsed
+
+5.00
+5.02
+
+ Performance counter stats for 'taskset 1 ./threads 16 a':
+
+        2001234529 cache-references                                            
+          41285234 cache-misses              #    2.063 % of all cache refs    
+             27030 L1-dcache-load-misses     #    0.00% of all L1-dcache hits  
+   <not supported> L1-dcache-prefetch-misses
+        1000820206 L1-dcache-loads                                             
+          41479990 LLC-loads                                                   
+   <not supported> LLC-prefetches          
+   <not supported> dTLB-loads              
+             60594 dTLB-load-misses          #    0.00% of all dTLB cache hits 
+               298 page-faults                                                 
+
+       2.515877014 seconds time elapsed
+
+4.68
+4.68
+
+ Performance counter stats for 'taskset 1 ./threads 64 a':
+
+        2001191809 cache-references                                            
+             31761 cache-misses              #    0.002 % of all cache refs    
+             26178 L1-dcache-load-misses     #    0.00% of all L1-dcache hits  
+   <not supported> L1-dcache-prefetch-misses
+        1000792643 L1-dcache-loads                                             
+            217064 LLC-loads                                                   
+   <not supported> LLC-prefetches          
+   <not supported> dTLB-loads              
+             58075 dTLB-load-misses          #    0.00% of all dTLB cache hits 
+               299 page-faults                                                 
+
+       2.345074237 seconds time elapsed
+
+161.27
+161.25
+
+ Performance counter stats for 'taskset 1 ./threads 16 s':
+
+         202571703 cache-references                                            
+         199874512 cache-misses              #   98.669 % of all cache refs    
+          99949611 L1-dcache-load-misses     #   98.29% of all L1-dcache hits  
+   <not supported> L1-dcache-prefetch-misses
+         101690091 L1-dcache-loads                                             
+         200348938 LLC-loads                                                   
+   <not supported> LLC-prefetches          
+   <not supported> dTLB-loads              
+            121072 dTLB-load-misses          #    0.00% of all dTLB cache hits 
+               298 page-faults                                                 
+
+       8.067062652 seconds time elapsed
+
+125.26
+125.05
+
+ Performance counter stats for 'taskset 1 ./threads 64 s':
+
+         202070226 cache-references                                            
+             47141 cache-misses              #    0.023 % of all cache refs    
+             36698 L1-dcache-load-misses     #    0.04% of all L1-dcache hits  
+   <not supported> L1-dcache-prefetch-misses
+         101392119 L1-dcache-loads                                             
+            419681 LLC-loads                                                   
+   <not supported> LLC-prefetches          
+   <not supported> dTLB-loads              
+            101020 dTLB-load-misses          #    0.00% of all dTLB cache hits 
+               299 page-faults                                                 
+
+       6.266583287 seconds time elapsed
+
+4.73
+1.56
+
+ Performance counter stats for 'taskset 1 ./threads 16 r':
+
+        1501107774 cache-references                                            
+          19897728 cache-misses              #    1.326 % of all cache refs    
+           9958174 L1-dcache-load-misses     #    1.00% of all L1-dcache hits  
+   <not supported> L1-dcache-prefetch-misses
+        1000742146 L1-dcache-loads                                             
+          20058736 LLC-loads                                                   
+   <not supported> LLC-prefetches          
+   <not supported> dTLB-loads              
+             53006 dTLB-load-misses          #    0.00% of all dTLB cache hits 
+               299 page-faults                                                 
+
+       2.367278242 seconds time elapsed
+
+4.69
+0.67
+
+ Performance counter stats for 'taskset 1 ./threads 64 r':
+
+        1501033797 cache-references                                            
+             29971 cache-misses              #    0.002 % of all cache refs    
+             24588 L1-dcache-load-misses     #    0.00% of all L1-dcache hits  
+   <not supported> L1-dcache-prefetch-misses
+        1000684264 L1-dcache-loads                                             
+            180919 LLC-loads                                                   
+   <not supported> LLC-prefetches          
+   <not supported> dTLB-loads              
+             50146 dTLB-load-misses          #    0.00% of all dTLB cache hits 
+               299 page-faults                                                 
+
+       2.348813120 seconds time elapsed
+

@@ -32,7 +32,7 @@ uint64_t getclock()
 		perror("clock_gettime");
 		exit(1);
 	}
-	return ts.tv_sec * 1000000000 + ts.tv_nsec;
+	return (uint64_t)ts.tv_sec * 1000000000 + ts.tv_nsec;
 }
 
 void permutation(unsigned *l, size_t n)
@@ -160,7 +160,7 @@ float memtest(size_t size, size_t line, int shuffle, unsigned nthreads)
 int main(int argc, char **argv) 
 {
 	float time;
-	size_t size, line;
+	unsigned long size, line;
 	char unit = 'b';
 	int shuffle = 1;
 	unsigned nthreads = 1;

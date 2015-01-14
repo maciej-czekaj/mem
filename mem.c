@@ -12,15 +12,15 @@
 
 struct list {
 	struct list *next;
+	/* Romiar wypełnienia jest konfigurowany*/
 	long pad[0];
-};
+} *list;
 
 #define CLOCK_TYPE CLOCK_MONOTONIC_RAW
 #define N (10*1000*1000)
 #define MAXTHREADS 16
 
 static pthread_barrier_t barrier;
-static struct list *list;
 static unsigned iterations;
 static float times[MAXTHREADS];
 static int write;

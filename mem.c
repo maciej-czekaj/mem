@@ -10,6 +10,36 @@
 
 #define max(a,b) ((a) > (b) ? (a) : (b))
 
+struct Good {
+  int flags;
+  int counter;
+  long array[7];
+};
+
+struct Bad {
+  int flags;
+  long a[7];
+  int counter;
+};
+
+struct Ugly {
+  long *not_used;
+  long array[7];
+  int flags;
+  int counter;
+} ;
+
+struct Pretty {
+  int flags;
+  int counter;
+  long array[7];
+  long not_used;
+};
+
+struct Good a;
+struct Bad b;
+struct Pretty p;
+struct Ugly u;
 struct list {
 	struct list *next;
 	/* Romiar wypełnienia jest konfigurowany*/

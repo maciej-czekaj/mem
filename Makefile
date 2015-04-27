@@ -12,11 +12,13 @@ endif
 
 LDLIBS=-lrt -lpthread
 
-all: mem threads
+all: mem threads quiz
 
 mem: mem.o
 
 threads: threads.o
+
+quiz: quiz.o
 
 clean:
 	rm -f mem mem.o threads threads.o

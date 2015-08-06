@@ -58,9 +58,13 @@ def bits(val, n):
 	return a
 
 def main():
+	if len(sys.argv) != 4:
+		print "Usage:\n\treadvm.py <PID> <VIRT-ADDR> <SIZE>"
+		print "example:\n\treadvm.py 1234 0x7f430000 0x1000"
+		return
 	pid = int(sys.argv[1])
 	va = int(sys.argv[2],16)
-	size = int(sys.argv[3])
+	size = int(eval(sys.argv[3]))
 	readvm(va, size, pid)
 
 if __name__ == '__main__':

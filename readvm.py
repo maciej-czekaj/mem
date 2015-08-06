@@ -33,13 +33,15 @@ PAGEFLAGS  =  {
 
 def readvm(va, size, pid):
 	vpfn = va / PG_SZ
-	off = vpfn * 8
+	va_off = vpfn * 8
 	pg_num = size / PG_SZ + (1 if size % PG_SZ else 0)
 	with open("/proc/%u/pagemap" % pid,"rb") as f:
-		f.seek(off)
-		pfn = struct.unpack("L", f.read(8))[0] & PFN_MASK
-		print hex(pfn * PG_SZ)
-		readpf(pfn, pg_num)
+		for pg in range(pg_num):
+			off = va_off + pg * 8
+			f.seek(off)
+			pfn = struct.unpack("L", f.read(8))[0] & PFN_MASK
+			flags, desc = readpf(pfn, 1)
+			print "VA %x PA %x flags %x %s" % ((vpfn + pg) * PG_SZ, pfn * PG_SZ, flags, desc)
 
 def readpf(pfn, pg_num):
 	off = pfn*8
@@ -47,8 +49,8 @@ def readpf(pfn, pg_num):
 		f.seek(off)
 		for i in range(pg_num):
 			flags = struct.unpack("L", f.read(8))[0]
-			pf_desc = [PAGEFLAGS.get(x) for x in bits(flags, 64)]
-			print hex(flags), ' '.join(pf_desc)
+			pf_desc = [PAGEFLAGS.get(x) for x in bits(flags, 64) if x in PAGEFLAGS]
+			return flags, ' '.join(pf_desc)
 
 def bits(val, n):
 	a = []

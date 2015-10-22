@@ -20,7 +20,7 @@ uint64_t getclock()
 #define N ((8<<20)/sizeof(long)) //8MB
 #define K ((1<<30) / N)
 
-long a[N] __attribute__((aligned(64)));
+long a[N];// __attribute__((aligned(64)));
 
 void quiz(unsigned step)
 {

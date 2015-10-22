@@ -47,9 +47,11 @@ long benchmark_v(struct list *l)
 long benchmark_a(struct list *l)
 {
 	unsigned i;
+	long r;
 
 	for (i=0; i < N; i++) {
-		ACCESS_ONCE(l->val) += 1;
+		r = __atomic_load_n(&l->val, __ATOMIC_RELAXED);
+		__atomic_store_n(&l->val, r + 10, __ATOMIC_RELAXED);
 	}
 	return N;
 }
@@ -60,7 +62,7 @@ long benchmark_s(struct list *l)
 	unsigned n = N/10;
 
 	for (i=0; i < n; i++) {
-		__sync_add_and_fetch(&l->val, 10);
+		__atomic_fetch_add(&l->val, 10, __ATOMIC_RELAXED);
 	}
 	return n;
 }
@@ -71,10 +73,12 @@ long benchmark_r(struct list *l)
 	long r;
 
 	for (i=0; i < N; i++) {
-		if (l == (struct list *)mem)
-			ACCESS_ONCE(l->val) += 1;
-		else
-			r = ACCESS_ONCE(l->val);
+		if (l == (struct list *)mem) {
+			r = __atomic_load_n(&l->val, __ATOMIC_RELAXED);
+			__atomic_store_n(&l->val, r + 10, __ATOMIC_RELAXED);
+		} else {
+			r = __atomic_load_n(&l->val, __ATOMIC_RELAXED);
+		}
 	}
 	(void)r;
 	return N;
@@ -121,7 +125,6 @@ int main(int argc, char **argv)
 		return 1;
 
 	switch(argv[2][0]) {
-	
 	case 'v':
 		benchmark = benchmark_v;
 		break;
@@ -130,15 +133,15 @@ int main(int argc, char **argv)
 		break;
 	case 'r':
 		benchmark = benchmark_r;
-		break;	
+		break;
 	case 'a':
 		benchmark = benchmark_a;
-		break;	
+		break;
 	default:
 		benchmark = NULL;
 	}
 
-	if (posix_memalign((void **)&mem, 64, nthreads*pad)) {
+	if (posix_memalign((void **)&mem, 128, nthreads*pad)) {
 		perror("posix_memalign");
 		return 1;
 	}
@@ -158,19 +161,20 @@ int main(int argc, char **argv)
 		pthread_attr_setaffinity_np(&attr, sizeof(c), &c);
 		pthread_create(&threads[i], &attr, thread, &mem[i*pad]);
 	}
-	
+
 	CPU_ZERO(&c);
 	CPU_SET(0, &c);
 	pthread_setaffinity_np(pthread_self(), sizeof(c), &c);
 
 	time = (float *) thread(&mem[0]);
 
-	printf("%.2f\n", *time);
+	printf("%.2f", *time);
 
 	for (i = 1; i < nthreads; i++) {
 		pthread_join(threads[i], (void **)&time);
-		printf("%.2f\n", *time);
+		printf(" %.2f", *time);
 	}
-		
+	printf("\n");
+
 	return 0;
 }

@@ -36,8 +36,9 @@ struct pingpong {
 static pthread_barrier_t barrier;
 
 
-void benchmark_ping(void)
+void *benchmark_ping(void *arg)
 {
+	(void)arg;
 	long ping_val, pong_val;
 	long *ping = &pingpong->ping;
 	long *pong = &pingpong->pong;
@@ -47,11 +48,13 @@ void benchmark_ping(void)
 	assert(ping_val == 0);
 	do {
 		ping_val += 1;
-		__atomic_store_n(ping, ping_val, __ATOMIC_RELAXED);
+		__atomic_store_n(ping, ping_val, __ATOMIC_RELEASE);
 		do {
-			pong_val = __atomic_load_n(pong, __ATOMIC_RELAXED);
+			pong_val = __atomic_load_n(pong, __ATOMIC_ACQUIRE);
 		} while (pong_val != ping_val);
 	} while (pong_val != N);
+
+	return NULL;
 }
 
 void *benchmark_pong(void *arg)
@@ -66,10 +69,10 @@ void *benchmark_pong(void *arg)
 	assert(pong_val == 0);
 	do {
 		do {
-			ping_val = __atomic_load_n(ping, __ATOMIC_RELAXED);
+			ping_val = __atomic_load_n(ping, __ATOMIC_ACQUIRE);
 		} while (ping_val == pong_val);
 		pong_val += 1;
-		__atomic_store_n(pong, pong_val, __ATOMIC_RELAXED);
+		__atomic_store_n(pong, pong_val, __ATOMIC_RELEASE);
 	} while (ping_val != N);
 
 	return NULL;
@@ -142,7 +145,7 @@ int main(int argc, char **argv)
 		CPU_ZERO(&c);
 		CPU_SET(i, &c);
 		pthread_attr_setaffinity_np(&attr, sizeof(c), &c);
-		pthread_create(&threads[i], &attr, benchmark_pong_sc, NULL);
+		pthread_create(&threads[i], &attr, benchmark_pong, NULL);
 	}
 
 	CPU_ZERO(&c);
@@ -150,7 +153,7 @@ int main(int argc, char **argv)
 	pthread_setaffinity_np(pthread_self(), sizeof(c), &c);
 
 	t1 = getclock();
-	benchmark_ping_sc(NULL);
+	benchmark_ping(NULL);
 	t2 = getclock();
 
 	time = (t2 - t1)/N*1.0f;

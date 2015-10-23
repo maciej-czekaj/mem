@@ -20,7 +20,7 @@ uint64_t getclock()
 	return (uint64_t)ts.tv_sec * 1000000000 + ts.tv_nsec;
 }
 
-#define N (50*1000*1000)
+#define N (1*1000*1000)
 #define MAXTHREADS 16
 #define ACCESS_ONCE(x) (*(volatile typeof(x) *)&(x))
 
@@ -50,7 +50,7 @@ void benchmark_ping(void)
 		__atomic_store_n(ping, ping_val, __ATOMIC_RELAXED);
 		do {
 			pong_val = __atomic_load_n(pong, __ATOMIC_RELAXED);
-		} while (pong_val == ping_val);
+		} while (pong_val != ping_val);
 	} while (pong_val != N);
 }
 
@@ -67,16 +67,17 @@ void *benchmark_pong(void *arg)
 	do {
 		do {
 			ping_val = __atomic_load_n(ping, __ATOMIC_RELAXED);
-		} while (ping_val - pong_val == 1);
+		} while (ping_val == pong_val);
 		pong_val += 1;
 		__atomic_store_n(pong, pong_val, __ATOMIC_RELAXED);
-	} while (pong_val != N);
+	} while (ping_val != N);
 
 	return NULL;
 }
 
-void benchmark_ping_sc(void)
+void *benchmark_ping_sc(void *arg)
 {
+	(void)arg;
 	long ping_val, pong_val;
 	long *ping = &pingpong->ping;
 	long *pong = &pingpong->pong;
@@ -85,11 +86,13 @@ void benchmark_ping_sc(void)
 	ping_val = __atomic_load_n(ping, __ATOMIC_RELAXED);
 	assert(ping_val == 0);
 	do {
-		ping_val = __atomic_add_fetch(ping, 1, __ATOMIC_SEQ_CST);
+		ping_val = __atomic_add_fetch(ping, 1, __ATOMIC_RELAXED);
 		do {
 			pong_val = __atomic_load_n(pong, __ATOMIC_RELAXED);
 		} while (pong_val == ping_val);
 	} while (pong_val != N);
+
+	return NULL;
 }
 
 void *benchmark_pong_sc(void *arg)
@@ -106,14 +109,15 @@ void *benchmark_pong_sc(void *arg)
 		do {
 			ping_val = __atomic_load_n(ping, __ATOMIC_RELAXED);
 		} while (ping_val - pong_val == 1);
-		pong_val = __atomic_add_fetch(pong, 1, __ATOMIC_SEQ_CST);
+		pong_val = __atomic_add_fetch(pong, 1, __ATOMIC_RELAXED);
 	} while (pong_val != N);
 
 	return NULL;
 }
 
+//void benchmark(void *(ping)(void *),
 
-int main(int argc, char **argv) 
+int main(int argc, char **argv)
 {
 	unsigned nthreads = 2;
 	pthread_t threads[MAXTHREADS];
@@ -146,7 +150,7 @@ int main(int argc, char **argv)
 	pthread_setaffinity_np(pthread_self(), sizeof(c), &c);
 
 	t1 = getclock();
-	benchmark_ping_sc();
+	benchmark_ping_sc(NULL);
 	t2 = getclock();
 
 	time = (t2 - t1)/N*1.0f;

@@ -47,7 +47,8 @@ struct list {
 } *list;
 
 #define CLOCK_TYPE CLOCK_MONOTONIC_RAW
-#define N (10*1000*1000)
+//#define N (100*1000*1000)
+#define N (1*1000)
 #define MAXTHREADS 16
 
 static pthread_barrier_t barrier;
@@ -55,7 +56,7 @@ static unsigned iterations;
 static float times[MAXTHREADS];
 static int write;
 
-uint64_t getclock()
+uint64_t getclock_2()
 {
 	struct timespec ts;
 	if (clock_gettime(CLOCK_TYPE, &ts) != 0) {
@@ -64,6 +65,24 @@ uint64_t getclock()
 	}
 	return (uint64_t)ts.tv_sec * 1000000000 + ts.tv_nsec;
 }
+
+uint64_t getclock_1()
+{
+	union {
+		uint64_t tsc_64;
+		struct {
+			uint32_t lo_32;
+			uint32_t hi_32;
+		};
+	} tsc;
+
+	asm volatile("rdtsc" :
+		     "=a" (tsc.lo_32),
+		     "=d" (tsc.hi_32));
+	return tsc.tsc_64;
+}
+
+#define getclock getclock_2
 
 void permutation(unsigned *l, size_t n)
 {
@@ -150,17 +169,21 @@ void *thread(void *arg)
 	return NULL;
 }
 
-float memtest(size_t size, size_t line, int shuffle, unsigned nthreads)
+void memtest_init(size_t size, size_t line, int shuffle)
 {
 	unsigned n = size/line;
+	iterations = max(N, 2*n);
+
+	list = meminit(size, line, shuffle);
+}
+
+float memtest(unsigned nthreads)
+{
 	unsigned i;
 	pthread_t threads[nthreads];
 	pthread_attr_t attr;
 	cpu_set_t c;
 
-	iterations = max(N, 2*n);
-
-	list = meminit(size, line, shuffle);
 	pthread_barrier_init(&barrier, NULL, nthreads);
 	pthread_attr_init(&attr);
 
@@ -215,7 +238,7 @@ int main(int argc, char **argv)
 
 	if (size < line || line < 8)
 		return 1;
-	
+
 	if (argc > 3 && strcmp(argv[3],"-l") == 0) {
 		shuffle = 0;
 	}
@@ -227,9 +250,13 @@ int main(int argc, char **argv)
 		write = 1;
 	}
 
-	time = memtest(size, line, shuffle, nthreads);
+	memtest_init(size, line, shuffle);
 
-	printf("%lu %.2f\n", size, time);
+	unsigned i;
+	for (i=0;i<20;i++) {
+		time = memtest(nthreads);
+		printf("%lu %.4f\n", size, time);
+	}
 
 	return 0;
 }

@@ -29,6 +29,11 @@ struct list {
 	long val;
 };
 
+struct thrarg {
+	double res;
+	void *arg;
+};
+
 static pthread_barrier_t barrier;
 static char *mem;
 static long (*benchmark)(struct list*);
@@ -88,20 +93,19 @@ static void *thread(void *arg)
 {
 	uint64_t t1, t2;
 	long n;
-	float *res;
+	struct thrarg *thrarg = (struct thrarg *)arg;
 
 	pthread_barrier_wait(&barrier);	
 
 	t1 = getclock();
 
-	n = benchmark(arg);
-	
+	n = benchmark(thrarg->arg);
+
 	t2=getclock();
 
-	res = malloc(sizeof(float));
-	*res = (t2 - t1)/(n*1.0);
+	thrarg->res = (t2 - t1)/(n*1.0);
 
-	return (void *)res;
+	return NULL;
 }
 
 
@@ -111,9 +115,9 @@ int main(int argc, char **argv)
 	unsigned nthreads = 2;
 	unsigned pad;
 	pthread_t threads[MAXTHREADS];
+	struct thrarg thrargs[MAXTHREADS];
 	pthread_attr_t attr;
 	cpu_set_t c;
-	float *time;
 
 	if (argc < 3)
 		return 1;
@@ -155,24 +159,17 @@ int main(int argc, char **argv)
 		l->next = l;
 	}
 
-	for (i = 1; i < nthreads; i++) {
+	for (i = 0; i < nthreads; i++) {
 		CPU_ZERO(&c);
 		CPU_SET(i, &c);
 		pthread_attr_setaffinity_np(&attr, sizeof(c), &c);
-		pthread_create(&threads[i], &attr, thread, &mem[i*pad]);
+		thrargs[i].arg = &mem[i*pad];
+		pthread_create(&threads[i], &attr, thread, &thrargs[i]);
 	}
 
-	CPU_ZERO(&c);
-	CPU_SET(0, &c);
-	pthread_setaffinity_np(pthread_self(), sizeof(c), &c);
-
-	time = (float *) thread(&mem[0]);
-
-	printf("%.2f", *time);
-
-	for (i = 1; i < nthreads; i++) {
-		pthread_join(threads[i], (void **)&time);
-		printf(" %.2f", *time);
+	for (i = 0; i < nthreads; i++) {
+		pthread_join(threads[i], NULL);
+		printf(" %.2f", thrargs[i].res);
 	}
 	printf("\n");
 

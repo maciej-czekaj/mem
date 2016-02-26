@@ -8,6 +8,10 @@
 #include <sched.h>
 #include <string.h>
 #include <math.h>
+#include <unistd.h>
+#include <sys/mman.h>
+#include <sys/wait.h>
+#include <sys/types.h>
 
 #include "bench.h"
 
@@ -25,16 +29,47 @@ uint64_t getclock()
 
 #define MAXTHREADS 16
 
+struct bench_shared {
+	uint32_t barrier;
+	struct thrarg thrargs[MAXTHREADS];
+};
 
+struct bench_shared *shared;
 
-static pthread_barrier_t barrier;
+static void *alloc_shared(size_t size)
+{
+	void *ptr = mmap(NULL, size,
+		PROT_READ|PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+
+	if (ptr == NULL) {
+		perror("mmap");
+		exit(1);
+	}
+	return ptr;
+}
+
+__attribute__((unused))
+static void free_shared(void *ptr, size_t size)
+{
+	munmap(ptr, size);
+}
+
+static void barrier_wait(uint32_t *barrier)
+{
+	uint32_t val = __atomic_sub_fetch(barrier, 1, __ATOMIC_RELAXED);
+	while (val != 0)
+		val = __atomic_load_n(barrier, __ATOMIC_RELAXED);
+}
 
 static void *thread(void *arg)
 {
 	uint64_t t1, t2;
-	struct thrarg *thrarg = (struct thrarg *)arg;
+	size_t tid = (size_t)arg;
+	struct thrarg *thrarg = &shared->thrargs[tid];
 
-	pthread_barrier_wait(&barrier);
+	thrarg->init(thrarg);
+
+	barrier_wait(&shared->barrier);
 
 	t1 = getclock();
 
@@ -47,21 +82,25 @@ static void *thread(void *arg)
 	return NULL;
 }
 
-static void benchmark_once(struct thrarg *thrarg, unsigned iters)
+void benchmark_once_thread(struct thrarg *thrarg, unsigned iters)
 {
-	const int new_thread = 1;
+	const int new_thread = 0;
 	size_t i;
 	unsigned nthreads = thrarg->threads;
+	struct thrarg *thrargs;
 	pthread_t threads[nthreads];
-	struct thrarg thrargs[nthreads];
 	pthread_attr_t attr;
 	cpu_set_t c;
 
 	thrarg->iters = iters;
 
-	pthread_barrier_init(&barrier, NULL, nthreads);
-	pthread_attr_init(&attr);
+	if (!shared)
+		shared = alloc_shared(sizeof(struct bench_shared));
 
+	thrargs = shared->thrargs;
+	shared->barrier = nthreads;
+
+	pthread_attr_init(&attr);
 
 	for (i=0; i < nthreads; i++) {
 		thrargs[i] = *thrarg;
@@ -73,11 +112,11 @@ static void benchmark_once(struct thrarg *thrarg, unsigned iters)
 		CPU_ZERO(&c);
 		CPU_SET(i, &c);
 		pthread_attr_setaffinity_np(&attr, sizeof(c), &c);
-		pthread_create(&threads[i], &attr, thread, &thrargs[i]);
+		pthread_create(&threads[i], &attr, thread, (void *)i);
 	}
 
 	if (!new_thread)
-		thread(&thrargs[0]);
+		thread((void *)(size_t)0);
 
 	i = (new_thread) ? 0 : 1;
 	for (; i < nthreads; i++)
@@ -86,6 +125,48 @@ static void benchmark_once(struct thrarg *thrarg, unsigned iters)
 	thrarg->res = thrargs[0].res;
 	thrarg->sum = thrargs[0].sum;
 }
+
+void benchmark_once_fork(struct thrarg *thrarg, unsigned iters)
+{
+	size_t i;
+	unsigned nthreads = thrarg->threads;
+	struct thrarg *thrargs;
+	cpu_set_t c;
+	pid_t pids[nthreads];
+
+	if (!shared)
+		shared = alloc_shared(sizeof(struct bench_shared));
+
+	thrargs = shared->thrargs;
+	shared->barrier = nthreads;
+
+	thrarg->iters = iters;
+
+	for (i=0; i < nthreads; i++) {
+		thrargs[i] = *thrarg;
+		thrargs[i].id = i;
+	}
+
+	for (i=0; i < nthreads; i++) {
+		CPU_ZERO(&c);
+		CPU_SET(i, &c);
+		pids[i] = fork();
+		if (!pids[i]) {
+			pthread_setaffinity_np(pthread_self(), sizeof(c), &c);
+			thread((void *)i);
+			exit(0);
+		}
+	}
+
+	for (i=0; i < nthreads; i++)
+		waitpid(pids[i], NULL, 0);
+
+	thrarg->res = thrargs[0].res;
+	thrarg->sum = thrargs[0].sum;
+}
+
+
+void (*benchmark_once)(struct thrarg *, unsigned) = benchmark_once_fork;
 
 static inline double sqr(double x)
 {
@@ -158,7 +239,7 @@ static void benchmark_auto(struct thrarg *thrarg)
 	fprintf(stderr, "sdev = %f\n",std_dev);
 	if (print_samples)
 		for (i = 0; i< n_final; i++)
-			printf("%f\n", samples[i]);
+			fprintf(stderr, "%f\n", samples[i]);
 	free(samples);
 }
 

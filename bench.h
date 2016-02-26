@@ -11,6 +11,7 @@ struct thrarg {
 	unsigned samples;
 	unsigned id;
 	benchmark_t benchmark;
+	benchmark_t init;
 	int print_samples;
 	double res;
 	double sum;
@@ -18,5 +19,7 @@ struct thrarg {
 };
 
 void do_benchmark(struct thrarg *thrarg);
+
+#define USE(x) asm volatile ("" :: "r" (x));
 
 #endif // _BENCH_H_

@@ -21,8 +21,10 @@ struct list {
 } *list;
 
 
-static int write;
-
+struct bench {
+	int write;
+	size_t size;
+} bench;
 
 void permutation(unsigned *l, size_t n)
 {
@@ -37,7 +39,7 @@ void permutation(unsigned *l, size_t n)
 	}
 }
 
-static struct list * meminit(size_t size, size_t line, int shuffle) 
+static struct list * meminit(size_t size, size_t line, int shuffle)
 {
 	unsigned i;
 	unsigned n = size/line;
@@ -81,7 +83,7 @@ void benchmark(struct thrarg *arg)
 {
 	struct list *l = list;
 	unsigned iters = arg->iters;
-	int w = write;
+	int w = bench.write;
 	size_t id = arg->id;
 
 	while (iters--) {
@@ -90,7 +92,19 @@ void benchmark(struct thrarg *arg)
 		l = l->next;
 	}
 
-	asm volatile ("" :: "r" (l));
+	USE(l);
+}
+
+void init(struct thrarg *arg)
+{
+	(void)arg;
+	size_t x = 0;
+	size_t i;
+	size_t *mem = (size_t *)list;
+
+	for (i = 0; i < bench.size/sizeof(size_t); i++)
+		x += mem[i];
+	USE(x);
 }
 
 void memtest_init(size_t size, size_t line, int shuffle)
@@ -135,9 +149,10 @@ int main(int argc, char **argv)
 	}
 
 	if (argc > 4 && strcmp(argv[4],"-w") == 0) {
-		write = 1;
+		bench.write = 1;
 	}
 
+	bench.size = size;
 	memtest_init(size, line, shuffle);
 
 	//unsigned n = size/line;
@@ -148,6 +163,7 @@ int main(int argc, char **argv)
 		.iters = 0,
 		.id = 0,
 		.benchmark = benchmark,
+		.init = init,
 		.print_samples = 1,
 	};
 

@@ -28,8 +28,22 @@ double student_sparse[][2] = {
 {60, 2.000},
 {80, 1.990},
 {100, 1.984},
-{1000, 1.962}
+{1000, 1.962},
 };
+
+double t_val(unsigned n)
+{
+	if (n <= 30)
+		return student_1_30[n];
+	
+	size_t i;
+	size_t len = sizeof(student_sparse)/sizeof(*student_sparse);
+	for (i = 1; i < len; i++) {
+		if (student_sparse[i][0] > n)
+			return student_sparse[i-1][1];
+	}
+	return student_sparse[i-1][1];
+}
 
 uint64_t getclock()
 {
@@ -179,7 +193,6 @@ void benchmark_once_fork(struct thrarg *thrarg, unsigned iters)
 	thrarg->sum = thrargs[0].sum;
 }
 
-
 void (*benchmark_once)(struct thrarg *, unsigned) = benchmark_once_fork;
 
 static inline double sqr(double x)
@@ -187,12 +200,34 @@ static inline double sqr(double x)
 	return x*x;
 }
 
+double avg(size_t n, double samples[n])
+{
+	size_t i;
+	double sum = 0.0;
+	for (i = 0; i < n; i++)
+		sum += samples[i];
+	double avg = sum/n;
+	return avg;
+}
+
+double stdev(size_t n, double samples[n], double avg)
+{
+	size_t i;
+	double var = 0.0;
+
+	for (i = 0; i < n; i++)
+		var += sqr(avg - samples[i]);
+	if (n <= 1)
+		n = 2;
+	double stdev = sqrt(var/(n-1));
+	return stdev;
+}
+
 static void benchmark_auto2(struct thrarg *thrarg)
 {
 	const double min_time_ns = 10000; //10us
 	const unsigned max_iters = 10000000;
-	const unsigned max_samples = 300;
-	const double t = 2.0;
+	const unsigned max_samples = 100;
 	const double error = 0.05;
 	size_t i;
 	unsigned iters;
@@ -208,56 +243,46 @@ static void benchmark_auto2(struct thrarg *thrarg)
 		return;
 	}
 
-	double isamples[initial_samples];
-	fprintf(stderr, "isamples=%u iters = %u ",initial_samples, iters);
-
-	double sum = 0;
-	for (i = 0; i< initial_samples; i++) {
-		benchmark_once(thrarg, iters);
-		isamples[i] = thrarg->res;
-		sum += isamples[i];
-	}
-	double avg = sum/initial_samples;
-	double var = 0.0;
-	for (i = 0; i< initial_samples; i++)
-		var += sqr(avg - isamples[i]);
-	double std_dev = sqrt(var/(initial_samples-1));
-	fprintf(stderr, "var=%f avg=%f std_dev = %f ",var, avg, std_dev);
-
-	double n_sqrt = (2*t_initial*std_dev)/(error*avg);
-	unsigned n_final = (unsigned)ceil(sqr(n_sqrt))+4;
-	fprintf(stderr, "n_final=%u ", n_final);
-
-	double *samples = (double *)calloc(n_final, sizeof(double));
+	double sum, avg, std_dev, u, e;
+	double *samples = (double *)calloc(max_samples, sizeof(double));
+	size_t n;
 
 	int print_samples = thrarg->print_samples;
 	sum = 0.0;
-	for (i=0; i< n_final; i++) {
+	avg = 0.0;
+	for (i = 0; i < max_samples; i++) {
 		benchmark_once(thrarg, iters);
 		samples[i] = thrarg->res;
 		sum += samples[i];
+		n = i + 1;
+		if (n < 5)
+			continue;
+		avg = sum/n;
+		std_dev = stdev(n, samples, avg);
+		double t = t_val(n);
+		u = std_dev * t;
+		e = u/avg;
+		fprintf(stderr, "a=%f e=%f u=%f t=%f sd=%f\n", avg,  e, u, t, std_dev);
+		if (e < error)
+			break;
 	}
-	avg = sum/n_final;
-
-	var = 0.0;
-	for (i = 0; i< n_final; i++)
-		var += sqr(avg - samples[i]);
-	std_dev = sqrt(var/(n_final-1));
 
 	thrarg->res = avg;
-	thrarg->samples = n_final;
+	thrarg->samples = n;
 	thrarg->iters = iters;
 	thrarg->sum = sum;
 	thrarg->sdev = std_dev;
 
-	fprintf(stderr, "sdev = %f\n",std_dev);
 	if (print_samples)
-		for (i = 0; i< n_final; i++)
+		for (i = 0; i < n; i++)
 			fprintf(stderr, "%f\n", samples[i]);
+	fprintf(stderr, "n = %zd sdev = %f u = %f e = %f\n",n, std_dev, u, e);
 	free(samples);
 }
 
-static void benchmark_auto(struct thrarg *thrarg)
+void benchmark_auto(struct thrarg *thrarg);
+
+void benchmark_auto(struct thrarg *thrarg)
 {
 	const double min_time_ns = 10000; //10us
 	const unsigned max_iters = 10000000;
@@ -332,6 +357,6 @@ void do_benchmark(struct thrarg *thrarg)
 	if (thrarg->iters)
 		benchmark_once(thrarg, thrarg->iters);
 	else
-		benchmark_auto(thrarg);
+		benchmark_auto2(thrarg);
 }
 

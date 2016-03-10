@@ -193,7 +193,7 @@ void benchmark_once_fork(struct thrarg *thrarg, unsigned iters)
 	thrarg->sum = thrargs[0].sum;
 }
 
-void (*benchmark_once)(struct thrarg *, unsigned) = benchmark_once_fork;
+void (*benchmark_once)(struct thrarg *, unsigned) = benchmark_once_thread;
 
 static inline double sqr(double x)
 {
@@ -225,14 +225,15 @@ double stdev(size_t n, double samples[n], double avg)
 
 static void benchmark_auto2(struct thrarg *thrarg)
 {
-	const double min_time_ns = 10000; //10us
+	const double min_time_ns = 100*1000*1000;
 	const unsigned max_iters = 10000000;
+	const unsigned min_iters = 10;
 	const unsigned max_samples = 100;
 	const double error = 0.05;
 	size_t i;
 	unsigned iters;
 
-	for (iters = 1; iters < max_iters; iters *= 2) {
+	for (iters = min_iters; iters < max_iters; iters *= 2) {
 		benchmark_once(thrarg, iters);
 		if (thrarg->sum > min_time_ns)
 			break;
@@ -262,7 +263,7 @@ static void benchmark_auto2(struct thrarg *thrarg)
 		double t = t_val(n);
 		u = std_dev * t;
 		e = u/avg;
-		fprintf(stderr, "a=%f e=%f u=%f t=%f sd=%f\n", avg,  e, u, t, std_dev);
+		//fprintf(stderr, "a=%f e=%f u=%f t=%f sd=%f\n", avg,  e, u, t, std_dev);
 		if (e < error)
 			break;
 	}
@@ -276,7 +277,8 @@ static void benchmark_auto2(struct thrarg *thrarg)
 	if (print_samples)
 		for (i = 0; i < n; i++)
 			fprintf(stderr, "%f\n", samples[i]);
-	fprintf(stderr, "n = %zd sdev = %f u = %f e = %f\n",n, std_dev, u, e);
+	fprintf(stderr, "i = %d n = %zd sdev = %f u = %f e = %f\n", 
+			iters, n, std_dev, u, e);
 	free(samples);
 }
 

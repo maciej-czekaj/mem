@@ -3,9 +3,10 @@ file=${1:-res.txt}
 
 stride=${2:-128}
 
+bench=${BENCH:-./mem_bench}
 
 function run {
-	./mem_bench $1 $2 $3 $4 | awk '{printf "%.1f %s\n", $1/1024, $2}'
+	$bench $1 $2 $3 $4 | awk '{printf "%.1f %s\n", $1/1024, $2}'
 }
 
 for i in {0..18}

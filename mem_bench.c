@@ -82,9 +82,9 @@ static struct list * meminit(size_t size, size_t line, int shuffle)
 void benchmark(struct thrarg *arg)
 {
 	struct list *l = list;
-	unsigned iters = arg->iters;
+	unsigned iters = arg->params.iters;
 	int w = bench.write;
-	size_t id = arg->id;
+	size_t id = arg->params.id;
 
 	while (iters--) {
 		if (w)
@@ -158,20 +158,21 @@ int main(int argc, char **argv)
 	//unsigned n = size/line;
 	//unsigned iterations = max(N, 2*n);
 
-	struct thrarg thrarg = {
+	struct thrarg thrarg = { .params = {
 		.threads = nthreads,
 		.iters = 0,
 		.id = 0,
 		.benchmark = benchmark,
 		.init = init,
-		.print_samples = 1,
-	};
+		.print_samples = true,
+	}};
 
-//	size_t i;
-//	for (i=0;i<20;i++) {
-		do_benchmark(&thrarg);
-		printf("%lu %.4f\n", size, thrarg.res);
-//	}
+	int err = benchmark_auto(&thrarg);
+	if (err) {
+		fprintf(stderr, "Bench error %s\n", strerror(err));
+		return 1;
+	}
+	printf("%lu %.4f\n", size, thrarg.result.avg);
 
 	return 0;
 }

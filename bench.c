@@ -276,11 +276,12 @@ int benchmark_auto(struct thrarg *thrarg)
 	thrarg->result.sum = sum;
 	thrarg->result.sdev = std_dev;
 
-	if (print_samples)
+	if (print_samples) {
 		for (i = 0; i < n; i++)
 			fprintf(stderr, "%f\n", samples[i]);
-	fprintf(stderr, "i = %d n = %zd sdev = %f u = %f e = %f\n", 
+		fprintf(stderr, "i = %d n = %zd sdev = %f u = %f e = %f\n",
 			iters, n, std_dev, u, e);
+	}
 	free(samples);
 	return 0;
 }

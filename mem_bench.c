@@ -160,8 +160,6 @@ int main(int argc, char **argv)
 
 	struct thrarg thrarg = { .params = {
 		.threads = nthreads,
-		.iters = 0,
-		.id = 0,
 		.benchmark = benchmark,
 		.init = init,
 		.print_samples = true,

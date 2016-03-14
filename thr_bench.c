@@ -34,8 +34,8 @@ void benchmark_a(struct thrarg *thr)
 	size_t n  = thr->params.iters;
 
 	for (i=0; i < n; i++) {
-		r = __atomic_load_n(&l->val, __ATOMIC_RELAXED);
-		__atomic_store_n(&l->val, r + 10, __ATOMIC_RELAXED);
+		l->val += 1;
+		l = l->next;
 	}
 	USE(r);
 }
@@ -48,6 +48,7 @@ void benchmark_s(struct thrarg *thr)
 
 	for (i=0; i < n; i++) {
 		__atomic_fetch_add(&l->val, 10, __ATOMIC_RELAXED);
+		l = l->next;
 	}
 }
 
@@ -61,10 +62,11 @@ void benchmark_w(struct thrarg *thr)
 
 	for (i=0; i < n; i++) {
 		if (id > 0) {
-			__atomic_store_n(&l->val, r + 10, __ATOMIC_RELAXED);
+			l->val += 1;
 		} else {
-			r = __atomic_load_n(&l->val, __ATOMIC_RELAXED);
+			r = l->val;
 		}
+		l = l->next;
 	}
 	USE(r);
 }
@@ -78,7 +80,8 @@ void benchmark_r(struct thrarg *thr)
 	size_t n  = thr->params.iters;
 
 	for (i=0; i < n; i++) {
-		r = __atomic_load_n(&l->val, __ATOMIC_RELAXED);
+		r = l->val;
+		l = l->next;
 	}
 	USE(r);
 }
@@ -141,6 +144,7 @@ int main(int argc, char **argv)
 		.benchmark = benchmark,
 		.init = init,
 		.print_samples = true,
+		.min_time =  10*1000*1000,
 	}};
 
 	int err = benchmark_auto(&thrarg);

@@ -1,13 +1,18 @@
 bench=${BENCH:-./thr_bench}
 
-./l1.sh $bench 16 a
-./l1.sh $bench 128 a
+a1=`$bench 16 a`
+a2=`$bench 128 a`
 
-./l1.sh $bench 16 s
-./l1.sh $bench 128 s
+s1=`$bench 16 s`
+s2=`$bench 128 s`
 
-./l1.sh $bench 16 r
-./l1.sh $bench 128 r
+r1=`$bench 16 r`
+r2=`$bench 128 r`
 
-./l1.sh $bench 16 w
-./l1.sh $bench 128 w
+w1=`$bench 16 w`
+w2=`$bench 128 w`
+
+echo $a1 $a2
+echo $s1 $s2
+echo $r1 $r2
+echo $w1 $w2

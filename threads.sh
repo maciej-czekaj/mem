@@ -1,14 +1,13 @@
-echo -n a1\ 
-./l1.sh ./threads 16 a
-echo -n a2\ 
-./l1.sh ./threads 128 a
+bench=${BENCH:-./thr_bench}
 
-echo -n s1\ 
-./l1.sh ./threads 16 s
-echo -n s2\ 
-./l1.sh ./threads 128 s
+./l1.sh $bench 16 a
+./l1.sh $bench 128 a
 
-echo -n r1\ 
-./l1.sh ./threads 16 r
-echo -n r2\ 
-./l1.sh ./threads 128 r
+./l1.sh $bench 16 s
+./l1.sh $bench 128 s
+
+./l1.sh $bench 16 r
+./l1.sh $bench 128 r
+
+./l1.sh $bench 16 w
+./l1.sh $bench 128 w

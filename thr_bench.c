@@ -152,7 +152,7 @@ int main(int argc, char **argv)
 		fprintf(stderr, "Bench error %s\n", strerror(err));
 		return 1;
 	}
-	printf("threads %c %u %.4f\n", argv[2][0], pad, thrarg.result.avg);
+	printf("%u %.4f\n", pad, thrarg.result.avg);
 
 	return 0;
 }

@@ -24,6 +24,8 @@ struct thrarg {
 		double avg;
 		double sum;
 		double sdev;
+		double u;
+		double err;
 	} result;
 };
 

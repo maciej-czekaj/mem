@@ -139,11 +139,13 @@ int main(int argc, char **argv)
 		lists[i] = l;
 	}
 
+	bool print_samples = getenv("BENCH_PRINT") ? true : false;
+
 	struct thrarg thrarg = { .params = {
 		.threads = nthreads,
 		.benchmark = benchmark,
 		.init = init,
-		.print_samples = true,
+		.print_samples = print_samples,
 		.min_time =  10*1000*1000,
 	}};
 
@@ -152,7 +154,7 @@ int main(int argc, char **argv)
 		fprintf(stderr, "Bench error %s\n", strerror(err));
 		return 1;
 	}
-	printf("%u %.4f\n", pad, thrarg.result.avg);
+	printf("%u %.2f %.2f\n", pad, thrarg.result.avg, thrarg.result.err);
 
 	return 0;
 }

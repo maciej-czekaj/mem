@@ -224,14 +224,60 @@ double stdev(size_t n, double samples[n], double avg)
 	return stdev;
 }
 
+static bool bench_try(struct thrarg *thrarg, unsigned iters)
+{
+	const unsigned max_samples = 300;
+	const unsigned min_samples = 10;
+	const double error = 0.05;
+	double sum, avg, std_dev, u, e;
+	double *samples = (double *)calloc(max_samples, sizeof(double));
+	size_t n, i;
+	bool print_samples = thrarg->params.print_samples;
+	bool success = false;
+
+	sum = 0.0;
+	avg = 0.0;
+	for (i = 0; i < max_samples; i++) {
+		bench_once(thrarg, iters);
+		samples[i] = thrarg->result.avg;
+		sum += samples[i];
+		n = i + 1;
+		if (n < min_samples)
+			continue;
+		avg = sum/n;
+		std_dev = stdev(n, samples, avg);
+		double t = t_val(n);
+		u = std_dev * t;
+		e = u/avg;
+		//fprintf(stderr, "a=%f e=%f u=%f t=%f sd=%f\n", avg,  e, u, t, std_dev);
+		if (e < error) {
+			success = true;
+			break;
+		}
+	}
+
+	thrarg->result.avg = avg;
+	thrarg->result.samples = n;
+	thrarg->result.iters = iters;
+	thrarg->result.sum = sum;
+	thrarg->result.sdev = std_dev;
+	thrarg->result.u = u;
+	thrarg->result.err = e;
+
+	if (print_samples) {
+		for (i = 0; i < n; i++)
+			fprintf(stderr, "%f\n", samples[i]);
+		fprintf(stderr, "i = %d n = %zd sdev = %f u = %f e = %f\n",
+			iters, n, std_dev, u, e);
+	}
+
+	return success;
+}
+
 int benchmark_auto(struct thrarg *thrarg)
 {
 	const unsigned max_iters = UINT_MAX;
 	const unsigned min_iters = 10;
-	const unsigned max_samples = 100;
-	const unsigned min_samples = 10;
-	const double error = 0.05;
-	size_t i;
 	unsigned iters;
 	unsigned long mt = thrarg->params.min_time;
 	const double min_time_ns = mt ? (double)mt : 100*1000*1000;
@@ -245,7 +291,7 @@ int benchmark_auto(struct thrarg *thrarg)
 	if (iters > max_iters) {
 		return -ENOSPC;
 	}
-
+#if 0
 	double sum, avg, std_dev, u, e;
 	double *samples = (double *)calloc(max_samples, sizeof(double));
 	size_t n;
@@ -275,6 +321,9 @@ int benchmark_auto(struct thrarg *thrarg)
 	thrarg->result.iters = iters;
 	thrarg->result.sum = sum;
 	thrarg->result.sdev = std_dev;
+	thrarg->result.u = u;
+	thrarg->result.err = e;
+
 
 	if (print_samples) {
 		for (i = 0; i < n; i++)
@@ -283,6 +332,9 @@ int benchmark_auto(struct thrarg *thrarg)
 			iters, n, std_dev, u, e);
 	}
 	free(samples);
+#endif
+
+	bench_try(thrarg, iters);
 	return 0;
 }
 

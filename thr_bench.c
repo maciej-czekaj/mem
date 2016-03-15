@@ -157,7 +157,7 @@ int main(int argc, char **argv)
 		fprintf(stderr, "Bench error %s\n", strerror(err));
 		return 1;
 	}
-	printf("%u %.2f %.2f\n", pad, thrarg.result.avg, thrarg.result.err);
+	printf("%u %.2f %.2f %.2f\n", pad, thrarg.result.avg, thrarg.result.err, thrarg.result.u);
 
 	return 0;
 }

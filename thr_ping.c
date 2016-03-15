@@ -88,8 +88,7 @@ int main(int argc, char **argv)
 		.threads = nthreads,
 		.benchmark = benchmark_ping,
 		.init = init,
-		.print_samples = true,
-		.min_time =  10*1000*1000,
+		.min_time =  1*1000*1000,
 	}};
 
 	int err = benchmark_auto(&thrarg);
@@ -97,7 +96,7 @@ int main(int argc, char **argv)
 		fprintf(stderr, "Bench error %s\n", strerror(err));
 		return 1;
 	}
-	printf("%.4f\n", thrarg.result.avg);
+	printf("%.2f %.2f %.2f\n", thrarg.result.avg, thrarg.result.err, thrarg.result.u);
 
 	return 0;
 }

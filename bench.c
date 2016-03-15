@@ -16,6 +16,9 @@
 
 #include "bench.h"
 
+#define min(a,b) ((a) < (b)) ? (a) : (b)
+#define max(a,b) ((a) < (b)) ? (b) : (a)
+
 #define CLOCK_TYPE CLOCK_MONOTONIC_RAW
 
 double student_1_30[] = {0, 12.71,
@@ -269,10 +272,10 @@ static bool bench_try(struct thrarg *thrarg, unsigned iters)
 	if (print_samples) {
 		for (i = 0; i < n; i++)
 			fprintf(stderr, "%f\n", samples[i]);
-		fprintf(stderr, "i = %d n = %zd sdev = %f u = %f e = %f\n",
-			iters, n, std_dev, u, e);
 	}
 
+	fprintf(stderr, "i = %d n = %zd sdev = %f u = %f e = %f a = %f\n",
+		iters, n, std_dev, u, e, avg);
 	return success;
 }
 
@@ -282,11 +285,12 @@ int benchmark_auto(struct thrarg *thrarg)
 	const unsigned min_iters = 10;
 	unsigned iters;
 	unsigned long mt = thrarg->params.min_time;
-	const double min_time_ns = mt ? (double)mt : 1*1000*1000;
+	const double min_time_ns = mt ? (double)mt : 1000*1000;
 	bool success;
 	size_t i;
-	double last_error = 1.0;
+	double last_error = 100.0;
 	struct thrarg last_arg;
+	double error;
 
 	for (iters = min_iters; iters < max_iters; iters *= 2) {
 		bench_once(thrarg, iters);
@@ -298,10 +302,14 @@ int benchmark_auto(struct thrarg *thrarg)
 		return -ENOSPC;
 	}
 
-	for (i = 0; i < 7 && iters <= max_iters; i++) {
+	for (i = 0; i < 64 && iters <= max_iters; i++) {
+		size_t j;
 		last_arg = *thrarg;
-		success = bench_try(thrarg, iters);
-		double error = thrarg->result.err;
+		error = 0.0;
+		for (j=0; j<3; j++) {
+			success = min(bench_try(thrarg, iters), success);
+			error = max(thrarg->result.err,error);
+		}
 		if (success)
 			break;
 		if (error > last_error) {

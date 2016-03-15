@@ -162,7 +162,6 @@ int main(int argc, char **argv)
 		.threads = nthreads,
 		.benchmark = benchmark,
 		.init = init,
-		.print_samples = true,
 	}};
 
 	int err = benchmark_auto(&thrarg);

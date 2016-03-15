@@ -16,7 +16,9 @@ struct thrarg {
 		benchmark_t init;
 		bool print_samples;
 		unsigned iters;
+		unsigned max_samples;
 		unsigned long min_time;
+		unsigned char max_error;
 	} params;
 	struct thres {
 		unsigned iters;

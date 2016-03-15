@@ -139,18 +139,21 @@ int main(int argc, char **argv)
 		lists[i] = l;
 	}
 
-	bool print_samples = getenv("BENCH_PRINT") ? true : false;
+	const char *bp = getenv("BENCH_PRINT");
+	bool print_samples = (bp && strcmp(bp,"y") == 0) ? true : false;
 
 	struct thrarg thrarg = { .params = {
 		.threads = nthreads,
 		.benchmark = benchmark,
 		.init = init,
 		.print_samples = print_samples,
-		.min_time =  10*1000*1000,
+		.max_samples = 100,
+		//.min_time =  10*1000*1000,
+		.max_error = 0.1,
 	}};
 
 	int err = benchmark_auto(&thrarg);
-	if (err) {
+	if (err < 0) {
 		fprintf(stderr, "Bench error %s\n", strerror(err));
 		return 1;
 	}

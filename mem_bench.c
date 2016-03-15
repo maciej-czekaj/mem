@@ -166,7 +166,7 @@ int main(int argc, char **argv)
 	}};
 
 	int err = benchmark_auto(&thrarg);
-	if (err) {
+	if (err < 0) {
 		fprintf(stderr, "Bench error %s\n", strerror(err));
 		return 1;
 	}

@@ -226,14 +226,16 @@ double stdev(size_t n, double samples[n], double avg)
 
 static bool bench_try(struct thrarg *thrarg, unsigned iters)
 {
-	const unsigned max_samples = 300;
 	const unsigned min_samples = 10;
-	const double error = 0.05;
-	double sum, avg, std_dev, u, e;
-	double *samples = (double *)calloc(max_samples, sizeof(double));
+	double sum, avg, std_dev, u, e = 1.0;
 	size_t n, i;
 	bool print_samples = thrarg->params.print_samples;
 	bool success = false;
+	const unsigned max_samples = thrarg->params.max_samples ?
+					thrarg->params.max_samples : 400;
+	const double error = thrarg->params.max_error ?
+			thrarg->params.max_error / 100.0 : 0.05;
+	double *samples = (double *)calloc(max_samples, sizeof(double));
 
 	sum = 0.0;
 	avg = 0.0;
@@ -280,7 +282,11 @@ int benchmark_auto(struct thrarg *thrarg)
 	const unsigned min_iters = 10;
 	unsigned iters;
 	unsigned long mt = thrarg->params.min_time;
-	const double min_time_ns = mt ? (double)mt : 100*1000*1000;
+	const double min_time_ns = mt ? (double)mt : 1*1000*1000;
+	bool success;
+	size_t i;
+	double last_error = 1.0;
+	struct thrarg last_arg;
 
 	for (iters = min_iters; iters < max_iters; iters *= 2) {
 		bench_once(thrarg, iters);
@@ -291,51 +297,23 @@ int benchmark_auto(struct thrarg *thrarg)
 	if (iters > max_iters) {
 		return -ENOSPC;
 	}
-#if 0
-	double sum, avg, std_dev, u, e;
-	double *samples = (double *)calloc(max_samples, sizeof(double));
-	size_t n;
 
-	int print_samples = thrarg->params.print_samples;
-	sum = 0.0;
-	avg = 0.0;
-	for (i = 0; i < max_samples; i++) {
-		bench_once(thrarg, iters);
-		samples[i] = thrarg->result.avg;
-		sum += samples[i];
-		n = i + 1;
-		if (n < min_samples)
-			continue;
-		avg = sum/n;
-		std_dev = stdev(n, samples, avg);
-		double t = t_val(n);
-		u = std_dev * t;
-		e = u/avg;
-		//fprintf(stderr, "a=%f e=%f u=%f t=%f sd=%f\n", avg,  e, u, t, std_dev);
-		if (e < error)
+	for (i = 0; i < 7 && iters <= max_iters; i++) {
+		last_arg = *thrarg;
+		success = bench_try(thrarg, iters);
+		double error = thrarg->result.err;
+		if (success)
 			break;
+		if (error > last_error) {
+			//back off
+			*thrarg = last_arg;
+			break;
+		}
+		last_error = error;
+		iters *= 2;
 	}
 
-	thrarg->result.avg = avg;
-	thrarg->result.samples = n;
-	thrarg->result.iters = iters;
-	thrarg->result.sum = sum;
-	thrarg->result.sdev = std_dev;
-	thrarg->result.u = u;
-	thrarg->result.err = e;
-
-
-	if (print_samples) {
-		for (i = 0; i < n; i++)
-			fprintf(stderr, "%f\n", samples[i]);
-		fprintf(stderr, "i = %d n = %zd sdev = %f u = %f e = %f\n",
-			iters, n, std_dev, u, e);
-	}
-	free(samples);
-#endif
-
-	bench_try(thrarg, iters);
-	return 0;
+	return success;
 }
 
 #if 0

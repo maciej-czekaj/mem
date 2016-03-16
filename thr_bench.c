@@ -14,17 +14,24 @@ struct list {
 static char *mem;
 static struct list *lists[MAX_THREADS];
 
-void benchmark_v(struct thrarg *thr)
+static void update_shared(struct list *l, size_t n)
 {
 	size_t i;
-	struct list *l = lists[thr->params.id];
-	size_t n  = thr->params.iters;
 
 	for (i=0; i < n; i++) {
 		l->val += 1;
 		l = l->next;
 	}
 }
+
+void benchmark_v(struct thrarg *thr)
+{
+	struct list *l = lists[thr->params.id];
+	size_t n  = thr->params.iters;
+
+	update_shared(l, n);
+}
+
 
 void benchmark_a(struct thrarg *thr)
 {
@@ -104,7 +111,7 @@ int main(int argc, char **argv)
 	if ( sscanf(argv[1], "%u", &pad) < 1)
 		return 1;
 
-	if (pad < sizeof(struct list))
+	if (pad < sizeof(struct list) && pad != 0)
 		return 1;
 
 	switch(argv[2][0]) {
@@ -148,7 +155,7 @@ int main(int argc, char **argv)
 		.init = init,
 		.print_samples = print_samples,
 		.max_samples = 100,
-		//.min_time =  10*1000*1000,
+		.min_time =  10*1000*1000,
 		.max_error = 0.1,
 	}};
 

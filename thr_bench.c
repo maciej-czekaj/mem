@@ -156,7 +156,7 @@ int main(int argc, char **argv)
 		.print_samples = print_samples,
 		.max_samples = 100,
 		.min_time =  10*1000*1000,
-		.max_error = 0.1,
+		.max_error = 10,
 	}};
 
 	int err = benchmark_auto(&thrarg);

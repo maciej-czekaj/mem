@@ -123,6 +123,7 @@ void benchmark_once_thread(struct thrarg *thrarg, unsigned iters)
 	pthread_t threads[nthreads];
 	pthread_attr_t attr;
 	cpu_set_t c;
+	const bool affinity = false;
 
 	thrarg->params.iters = iters;
 
@@ -141,9 +142,11 @@ void benchmark_once_thread(struct thrarg *thrarg, unsigned iters)
 
 	i = (new_thread) ? 0 : 1;
 	for (; i < nthreads; i++) {
-		CPU_ZERO(&c);
-		CPU_SET(i, &c);
-		pthread_attr_setaffinity_np(&attr, sizeof(c), &c);
+		if (affinity) {
+			CPU_ZERO(&c);
+			CPU_SET(i, &c);
+			pthread_attr_setaffinity_np(&attr, sizeof(c), &c);
+		}
 		pthread_create(&threads[i], &attr, thread, (void *)i);
 	}
 
@@ -276,6 +279,8 @@ static bool bench_try(struct thrarg *thrarg, unsigned iters)
 
 	fprintf(stderr, "i = %d n = %zd sdev = %f u = %f e = %f a = %f\n",
 		iters, n, std_dev, u, e, avg);
+	//fprintf(stderr, "i = %d n = %zd sdev = %f u = %f e = %f a = %f me = %f s = %hhd\n",
+		//iters, n, std_dev, u, e, avg, error, (char)success);
 	return success;
 }
 
@@ -306,6 +311,7 @@ int benchmark_auto(struct thrarg *thrarg)
 		size_t j;
 		last_arg = *thrarg;
 		error = 0.0;
+		success = true;
 		for (j=0; j<3; j++) {
 			success = min(bench_try(thrarg, iters), success);
 			error = max(thrarg->result.err,error);

@@ -1,4 +1,4 @@
-CFLAGS=-g -Wall -Wextra -Werror
+CFLAGS=-g -Wall -Wextra -Werror -std=gnu11
 ifeq ($(DEBUG),1)
  CFLAGS+=-O0 -DDEBUG
 else

@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdbool.h>
 #include "bench.h"
 
 struct list {
@@ -14,12 +15,30 @@ struct list {
 static char *mem;
 static struct list *lists[MAX_THREADS];
 
-static void update_shared(struct list *l, size_t n)
+void nonatominc_inc(struct list *l, size_t n)
 {
-	size_t i;
-
-	for (i=0; i < n; i++) {
+	for (size_t i=0; i < n; i++) {
 		l->val += 1;
+		l = l->next;
+	}
+}
+
+void atomic_add(struct list *l, size_t n)
+{
+	for (size_t i=0; i < n; i++) {
+		__atomic_fetch_add(&l->val, 1, __ATOMIC_RELAXED);
+		l = l->next;
+	}
+}
+
+void atomic_rw(struct list *l, size_t n, bool modify)
+{
+	for (size_t i=0; i < n; i++) {
+		if (modify) {
+			l->val += 1;
+		} else {
+			__atomic_load_n(&l->val, __ATOMIC_RELAXED);
+		}
 		l = l->next;
 	}
 }
@@ -29,7 +48,7 @@ void benchmark_v(struct thrarg *thr)
 	struct list *l = lists[thr->params.id];
 	size_t n  = thr->params.iters;
 
-	update_shared(l, n);
+	nonatominc_inc(l, n);
 }
 
 
@@ -47,35 +66,25 @@ void benchmark_a(struct thrarg *thr)
 	USE(r);
 }
 
+
+
+
 void benchmark_s(struct thrarg *thr)
 {
-	size_t i;
 	struct list *l = lists[thr->params.id];
 	size_t n  = thr->params.iters;
-
-	for (i=0; i < n; i++) {
-		__atomic_fetch_add(&l->val, 10, __ATOMIC_RELAXED);
-		l = l->next;
-	}
+	atomic_add(l, n);
 }
+
+
 
 void benchmark_w(struct thrarg *thr)
 {
-	size_t i;
-	long r = 0;
 	unsigned id = thr->params.id;
 	struct list *l = lists[id];
 	size_t n  = thr->params.iters;
 
-	for (i=0; i < n; i++) {
-		if (id > 0) {
-			l->val += 1;
-		} else {
-			r = l->val;
-		}
-		l = l->next;
-	}
-	USE(r);
+	atomic_rw(l, n, (bool)id);
 }
 
 void benchmark_r(struct thrarg *thr)

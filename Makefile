@@ -11,9 +11,11 @@ endif
 
 LDLIBS=-lrt -lpthread -lm
 
-all: mem threads quiz ping mem_bench thr_bench thr_ping
+all: mem threads quiz ping mem_bench thr_bench thr_ping mbox
 
 mem: mem.o
+
+mbox: mbox.o bench.o
 
 thr_ping: thr_ping.o bench.o
 

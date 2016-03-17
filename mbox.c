@@ -14,8 +14,8 @@
 struct message
 {
 	size_t count;
-	char message[32];
-}
+//	char message[32];
+};
 
 struct mbox {
 	size_t received;
@@ -24,34 +24,52 @@ struct mbox {
 	size_t sent;
 } *mbx;
 
+static bool mbox_reader_begin(struct mbox *mbx)
+{
+	size_t received, sent;
+	(void)received;
+	//received  = __atomic_load_n(&mbx->received, __ATOMIC_RELAXED);
+	sent = __atomic_load_n(&mbx->sent, __ATOMIC_ACQUIRE);
 
+	return sent > mbx->received;
+}
+
+static void mbox_reader_end(struct mbox *mbx)
+{
+	__atomic_store_n(&mbx->received, mbx->received + 1, __ATOMIC_RELEASE);
+}
 
 bool mbox_receive(struct mbox *mbx, struct message *msg)
 {
-	size_t received, sent;
-
-	received  = __atomic_load_n(&mbx->received, __ATOMIC_RELAXED);
-	sent = _atomic_load_n(&mbx->sent, __ATOMIC_ACQUIRE);
-
-	if (sent > received) {
+	if (mbox_reader_begin(mbx)) {
 		*msg =  mbx->message;
-		__atomic_store_n(&mbx->received, received + 1, __ATOMIC_RELEASE);
+		mbox_reader_end(mbx);
 		return true;
 	}
 	return false;
 }
 
+static bool mbox_writer_begin(struct mbox *mbx)
+{
+	size_t received, sent;
+	(void)sent;
+
+	//sent = __atomic_load_n(&mbx->sent, __ATOMIC_RELAXED);
+	received  = __atomic_load_n(&mbx->received, __ATOMIC_ACQUIRE);
+
+	return mbx->sent == received;
+}
+
+static void mbox_writer_end(struct mbox *mbx)
+{
+	__atomic_store_n(&mbx->sent, mbx->sent + 1, __ATOMIC_RELEASE);
+}
 
 bool mbox_send(struct mbox *mbx, struct message *msg)
 {
-	size_t received, sent;
-
-	sent = _atomic_load_n(&mbx->sent, __ATOMIC_RELAXED);
-	received  = __atomic_load_n(&mbx->received, __ATOMIC_ACQUIRE);
-
-	if (sent == received) {
+	if (mbox_writer_begin(mbx)) {
 		mbx->message = *msg;
-		__atomic_store_n(&mbx->sent, sent + 1, __ATOMIC_RELEASE);
+		mbox_writer_end(mbx);
 		return true;
 	}
 	return false;
@@ -61,22 +79,34 @@ void send(size_t n)
 {
 	struct message msg = {.count = 0};
 
-	msg.message.count++;
-	mbox_send
+	for (size_t i = 0; i < n; i++) {
+		msg.count = i;
+		while (!mbox_send(mbx, &msg));
+	}
+}
+
+void recv(size_t n)
+{
+	struct message msg;
+
+	for (size_t i = 0; i < n; i++) {
+		while (!mbox_receive(mbx, &msg));
+		assert(msg.count == i);
+	}
 }
 
 void benchmark_ping(struct thrarg *arg)
 {
-	if (arg->params.id) {
-		while (mbox_recv(mbx, "Hello"))
+	if (arg->params.id)
+		send(arg->params.iters);
 	else
-		ping(arg);
+		recv(arg->params.iters);
 }
 
 void init(struct thrarg *arg)
 {
 	(void)arg;
-	memset(pingpong, 0, sizeof(struct pingpong));
+	memset(mbx, 0, sizeof(struct mbox));
 }
 
 int main(int argc, char **argv)
@@ -84,12 +114,12 @@ int main(int argc, char **argv)
 	unsigned nthreads = 2;
 	(void)argc; (void)argv;
 
-	if (posix_memalign((void **)&pingpong, 128, sizeof(struct pingpong))) {
+	if (posix_memalign((void **)&mbx, 64, sizeof(struct mbox))) {
 		perror("posix_memalign");
 		return 1;
 	}
 
-	memset(pingpong, 0, sizeof(struct pingpong));
+	memset(mbx, 0, sizeof(struct mbox));
 
 	struct thrarg thrarg = { .params = {
 		.threads = nthreads,
@@ -99,7 +129,7 @@ int main(int argc, char **argv)
 	}};
 
 	int err = benchmark_auto(&thrarg);
-	if (err) {
+	if (err < 0) {
 		fprintf(stderr, "Bench error %s\n", strerror(err));
 		return 1;
 	}

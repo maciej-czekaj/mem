@@ -18,17 +18,15 @@ struct message
 };
 
 struct mbox {
-	size_t received;
+	size_t sent;
 	struct message message;
 	void *cache[0] __attribute__((aligned(64)));
-	size_t sent;
+	size_t received;
 } *mbx;
 
 static bool mbox_reader_begin(struct mbox *mbx)
 {
-	size_t received, sent;
-	(void)received;
-	//received  = __atomic_load_n(&mbx->received, __ATOMIC_RELAXED);
+	size_t sent;
 	sent = __atomic_load_n(&mbx->sent, __ATOMIC_ACQUIRE);
 
 	return sent > mbx->received;
@@ -51,10 +49,8 @@ bool mbox_receive(struct mbox *mbx, struct message *msg)
 
 static bool mbox_writer_begin(struct mbox *mbx)
 {
-	size_t received, sent;
-	(void)sent;
+	size_t received;
 
-	//sent = __atomic_load_n(&mbx->sent, __ATOMIC_RELAXED);
 	received  = __atomic_load_n(&mbx->received, __ATOMIC_ACQUIRE);
 
 	return mbx->sent == received;

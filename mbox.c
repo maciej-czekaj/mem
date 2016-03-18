@@ -3,14 +3,29 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
-#include <assert.h>
 
 #include "bench.h"
+
+#define assert(x) if(__builtin_expect((x), 0)) __builtin_trap()
 
 #define N (1*1000*1000)
 #define MAXTHREADS 16
 
+#define EXCLUSIVE
 
+#ifdef EXCLUSIVE
+#define mbox_writer_begin mbox_trylock
+#define mbox_writer_end mbox_unlock
+
+#define mbox_reader_begin mbox_trylock
+#define mbox_reader_end mbox_unlock
+#else
+#define mbox_writer_begin mbox_writer_acquire
+#define mbox_writer_end mbox_writer_release
+
+#define mbox_reader_begin mbox_reader_acquire
+#define mbox_reader_end mbox_reader_release
+#endif 
 struct message
 {
 	size_t count;
@@ -19,35 +34,30 @@ struct message
 
 struct mbox {
 	size_t sent;
-	struct message message;
-	void *cache[0] __attribute__((aligned(64)));
+	void *cache1[0] __attribute__((aligned(64)));
 	size_t received;
+	void *cache2[0] __attribute__((aligned(64)));
+	struct message message;
 } *mbx;
 
-static bool mbox_reader_begin(struct mbox *mbx)
-{
-	size_t sent;
-	sent = __atomic_load_n(&mbx->sent, __ATOMIC_ACQUIRE);
 
-	return sent > mbx->received;
+#ifdef EXCLUSIVE
+static bool mbox_trylock(struct mbox *mbx)
+{
+	size_t sent = __atomic_load_n(&mbx->sent, __ATOMIC_RELAXED);
+	if (sent != 0)
+		return false;
+	bool success =  __atomic_compare_exchange_n(&mbx->sent, &sent, 1, false, __ATOMIC_ACQUIRE, __ATOMIC_RELAXED);
+	return success;
 }
 
-static void mbox_reader_end(struct mbox *mbx)
+static void mbox_unlock(struct mbox *mbx)
 {
-	__atomic_store_n(&mbx->received, mbx->received + 1, __ATOMIC_RELEASE);
+	assert(mbx->sent == 1);
+	__atomic_store_n(&mbx->sent, 0, __ATOMIC_RELEASE);
 }
-
-bool mbox_receive(struct mbox *mbx, struct message *msg)
-{
-	if (mbox_reader_begin(mbx)) {
-		*msg =  mbx->message;
-		mbox_reader_end(mbx);
-		return true;
-	}
-	return false;
-}
-
-static bool mbox_writer_begin(struct mbox *mbx)
+#else
+static bool mbox_writer_acquire(struct mbox *mbx)
 {
 	size_t received;
 
@@ -56,16 +66,41 @@ static bool mbox_writer_begin(struct mbox *mbx)
 	return mbx->sent == received;
 }
 
-static void mbox_writer_end(struct mbox *mbx)
+static void mbox_writer_release(struct mbox *mbx)
 {
 	__atomic_store_n(&mbx->sent, mbx->sent + 1, __ATOMIC_RELEASE);
 }
 
+static bool mbox_reader_acquire(struct mbox *mbx)
+{
+	size_t sent;
+	sent = __atomic_load_n(&mbx->sent, __ATOMIC_ACQUIRE);
+
+	return sent > mbx->received;
+}
+
+static void mbox_reader_release(struct mbox *mbx)
+{
+	__atomic_store_n(&mbx->received, mbx->received + 1, __ATOMIC_RELEASE);
+}
+#endif
+
 bool mbox_send(struct mbox *mbx, struct message *msg)
 {
 	if (mbox_writer_begin(mbx)) {
+		assert(mbx->sent == 1);
 		mbx->message = *msg;
 		mbox_writer_end(mbx);
+		return true;
+	}
+	return false;
+}
+
+bool mbox_receive(struct mbox *mbx, struct message *msg)
+{
+	if (mbox_reader_begin(mbx)) {
+		*msg =  mbx->message;
+		mbox_reader_end(mbx);
 		return true;
 	}
 	return false;

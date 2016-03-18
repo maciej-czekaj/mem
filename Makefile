@@ -1,6 +1,6 @@
 CFLAGS=-g -Wall -Wextra -Werror -std=gnu11
 ifeq ($(DEBUG),1)
- CFLAGS+=-O0 -DDEBUG
+ CFLAGS+=-Og -DDEBUG
 else
  CFLAGS+=-O3
 endif
@@ -32,4 +32,4 @@ bench.o: bench.c
 mem_bench: bench.o mem_bench.o
 
 clean:
-	rm -f mem mem.o threads threads.o ping ping.o
+	rm -f mem mem.o threads *.o

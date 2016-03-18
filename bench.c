@@ -123,7 +123,7 @@ void benchmark_once_thread(struct thrarg *thrarg, unsigned iters)
 	pthread_t threads[nthreads];
 	pthread_attr_t attr;
 	cpu_set_t c;
-	const bool affinity = false;
+	const bool affinity = true;
 
 	thrarg->params.iters = iters;
 

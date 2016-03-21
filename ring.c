@@ -27,13 +27,9 @@ struct message
 };
 
 struct ring {
-	unsigned lock;
-	void *cache1[0] __attribute__((aligned(64)));
-	unsigned received;
-	void *cache2[0] __attribute__((aligned(64)));
-	unsigned sent;
-	void *cache3[0] __attribute__((aligned(64)));
 	unsigned len;
+	unsigned received __attribute__((aligned(64)));
+	unsigned sent __attribute__((aligned(64)));
 	struct message messages[0];
 }__attribute__((aligned(64))) *R;
 
@@ -135,6 +131,7 @@ bool ring_receive(struct ring *r, size_t n, struct message msg[n], bool excl)
 }
 
 #else
+
 bool ring_send(struct ring *r, size_t n, struct message msg[n])
 {
 	unsigned received, sent, len, space, mask;
@@ -185,7 +182,6 @@ void send(size_t n)
 		msg.count = i;
 		while (!ring_send(R, 1, &msg))
 			;
-		//printf("%zu\n", i);
 	}
 }
 
@@ -196,8 +192,7 @@ void recv(size_t n)
 	for (size_t i = 0; i < n; i++) {
 		while (!ring_receive(R, 1, &msg))
 			;
-		assert_eq(msg.count,i);
-		//printf("%zu\n", i);
+		assert(msg.count,i);
 	}
 }
 
@@ -213,7 +208,9 @@ void ring_reset(struct ring *r)
 {
 	r->sent = 0;
 	r->received = 0;
+#ifdef WITH_LOCK
 	r->lock = 0;
+#endif
 }
 
 struct ring *ring_new(size_t ring_len)
@@ -262,7 +259,7 @@ int main(int argc, char **argv)
 		.benchmark = benchmark_ping,
 		.init = init,
 		.min_time =  100*1000,
-		.max_samples =  30,
+		.max_samples =  100,
 		.max_error = 10,
 		.iters = 10,
 	}};

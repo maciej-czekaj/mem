@@ -8,7 +8,7 @@
 
 #include "bench.h"
 
-#define assert(x) if(__builtin_expect((x), 0)) __builtin_trap()
+#define assert(x) if(!(x)) __builtin_trap()
 #define assert_eq(x,y) \
 	do { \
 		if((x) != (y)) { \
@@ -140,8 +140,8 @@ bool ring_send(struct ring *r, size_t n, struct message msg[n])
 	len = r->len;
 	mask = len - 1;
 	received  = __atomic_load_n(&r->received, __ATOMIC_ACQUIRE);
-	space = sent - received + n;
-	if (space > len)
+	space = len + received - sent;
+	if (space < n)
 		return false;
 
 	for (size_t i = 0; i < n; i++)
@@ -192,7 +192,7 @@ void recv(size_t n)
 	for (size_t i = 0; i < n; i++) {
 		while (!ring_receive(R, 1, &msg))
 			;
-		assert(msg.count,i);
+		assert(msg.count == i);
 	}
 }
 
@@ -229,6 +229,7 @@ void init(struct thrarg *arg)
 {
 	(void)arg;
 	ring_reset(R);
+	__atomic_thread_fence(__ATOMIC_SEQ_CST);
 }
 
 void usage()

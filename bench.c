@@ -233,7 +233,7 @@ double stdev(size_t n, double samples[n], double avg)
 static bool bench_try(struct thrarg *thrarg, unsigned iters)
 {
 	const unsigned min_samples = 10;
-	double sum, avg, std_dev, u, e = 1.0;
+	double sum, avg, std_dev = 1.0, u = 1.0, e = 1.0;
 	size_t n, i;
 	bool print_samples = thrarg->params.print_samples;
 	bool success = false;
@@ -243,8 +243,12 @@ static bool bench_try(struct thrarg *thrarg, unsigned iters)
 			thrarg->params.max_error / 100.0 : 0.05;
 	double *samples = (double *)calloc(max_samples, sizeof(double));
 
+	if (max_samples < min_samples)
+		return false;
+
 	sum = 0.0;
 	avg = 0.0;
+	n = 0;
 	for (i = 0; i < max_samples; i++) {
 		bench_once(thrarg, iters);
 		samples[i] = thrarg->result.avg;

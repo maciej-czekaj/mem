@@ -21,6 +21,8 @@
 //#define WITH_LOCK
 //#define EXCLUSIVE true
 
+#define CACHE_LINE 64
+
 struct message
 {
 	size_t count;
@@ -28,11 +30,76 @@ struct message
 
 struct ring {
 	unsigned len;
-	unsigned received __attribute__((aligned(64)));
-	unsigned sent __attribute__((aligned(64)));
+	unsigned received __attribute__((aligned(CACHE_LINE)));
+	unsigned sent __attribute__((aligned(CACHE_LINE)));
 	struct message messages[0];
-}__attribute__((aligned(64))) *R;
+}__attribute__((aligned(CACHE_LINE))) *R;
 
+#ifndef WITH_LOCK
+
+bool ring_send(struct ring *r, size_t n, struct message msg[n])
+{
+	unsigned received, sent, len, space, mask;
+
+	sent = r->sent;
+	len = r->len;
+	mask = len - 1;
+	received  = __atomic_load_n(&r->received, __ATOMIC_ACQUIRE);
+	space = len + received - sent;
+	if (space < n)
+		return false;
+
+	for (size_t i = 0; i < n; i++)
+		r->messages[(sent+i) & mask] = msg[i];
+
+	__atomic_store_n(&r->sent, sent + n, __ATOMIC_RELEASE);
+
+	return true;
+}
+
+
+bool ring_receive(struct ring *r, size_t n, struct message msg[n])
+{
+	unsigned received, sent, len, space, mask;
+
+	received = r->received;
+	len = r->len;
+	mask = len - 1;
+	sent  = __atomic_load_n(&r->sent, __ATOMIC_ACQUIRE);
+	space = sent - received;
+	if (space < n)
+		return false;
+
+	for (size_t i = 0; i < n; i++)
+		msg[i] = r->messages[(received+i) & mask];
+
+	__atomic_store_n(&r->received, received + n, __ATOMIC_RELEASE);
+
+	return true;
+}
+#endif
+
+void send(size_t n)
+{
+	struct message msg = {.count = 0};
+
+	for (size_t i = 0; i < n; i++) {
+		msg.count = i;
+		while (!ring_send(R, 1, &msg))
+			;
+	}
+}
+
+void recv(size_t n)
+{
+	struct message msg;
+
+	for (size_t i = 0; i < n; i++) {
+		while (!ring_receive(R, 1, &msg))
+			;
+		assert(msg.count == i);
+	}
+}
 
 //#define CAS
 #ifdef WITH_LOCK
@@ -64,7 +131,7 @@ static void unlock(unsigned *lock)
 #endif
 }
 
-static bool ring_send(struct ring *r, size_t n, struct message msg[n], bool excl)
+bool ring_send(struct ring *r, size_t n, struct message msg[n], bool excl)
 {
 	unsigned received, sent, len, space, mask;
 
@@ -130,71 +197,8 @@ bool ring_receive(struct ring *r, size_t n, struct message msg[n], bool excl)
 	return true;
 }
 
-#else
-
-bool ring_send(struct ring *r, size_t n, struct message msg[n])
-{
-	unsigned received, sent, len, space, mask;
-
-	sent = r->sent;
-	len = r->len;
-	mask = len - 1;
-	received  = __atomic_load_n(&r->received, __ATOMIC_ACQUIRE);
-	space = len + received - sent;
-	if (space < n)
-		return false;
-
-	for (size_t i = 0; i < n; i++)
-		r->messages[(sent+i) & mask] = msg[i];
-
-	__atomic_store_n(&r->sent, sent + n, __ATOMIC_RELEASE);
-
-	return true;
-}
-
-
-bool ring_receive(struct ring *r, size_t n, struct message msg[n])
-{
-	unsigned received, sent, len, space, mask;
-
-	received = r->received;
-	len = r->len;
-	mask = len - 1;
-	sent  = __atomic_load_n(&r->sent, __ATOMIC_ACQUIRE);
-	space = sent - received;
-	if (space < n)
-		return false;
-
-	for (size_t i = 0; i < n; i++)
-		msg[i] = r->messages[(received+i) & mask];
-
-	__atomic_store_n(&r->received, received + n, __ATOMIC_RELEASE);
-
-	return true;
-}
 #endif
 
-void send(size_t n)
-{
-	struct message msg = {.count = 0};
-
-	for (size_t i = 0; i < n; i++) {
-		msg.count = i;
-		while (!ring_send(R, 1, &msg))
-			;
-	}
-}
-
-void recv(size_t n)
-{
-	struct message msg;
-
-	for (size_t i = 0; i < n; i++) {
-		while (!ring_receive(R, 1, &msg))
-			;
-		assert(msg.count == i);
-	}
-}
 
 void benchmark_ping(struct thrarg *arg)
 {

@@ -18,8 +18,8 @@
 	} while (0)
 
 #define RING_LEN 32
-#define WITH_LOCK
-#define EXCLUSIVE true
+//#define WITH_LOCK
+//#define EXCLUSIVE true
 
 struct message
 {
@@ -39,7 +39,7 @@ struct ring {
 
 
 //#define CAS
-
+#ifdef WITH_LOCK
 static void lock(unsigned *lock)
 {
 #ifdef CAS
@@ -68,7 +68,6 @@ static void unlock(unsigned *lock)
 #endif
 }
 
-#ifdef WITH_LOCK
 static bool ring_send(struct ring *r, size_t n, struct message msg[n], bool excl)
 {
 	unsigned received, sent, len, space, mask;
@@ -184,7 +183,7 @@ void send(size_t n)
 
 	for (size_t i = 0; i < n; i++) {
 		msg.count = i;
-		while (!ring_send(R, 1, &msg, EXCLUSIVE))
+		while (!ring_send(R, 1, &msg))
 			;
 		//printf("%zu\n", i);
 	}
@@ -195,7 +194,7 @@ void recv(size_t n)
 	struct message msg;
 
 	for (size_t i = 0; i < n; i++) {
-		while (!ring_receive(R, 1, &msg, EXCLUSIVE))
+		while (!ring_receive(R, 1, &msg))
 			;
 		assert_eq(msg.count,i);
 		//printf("%zu\n", i);
@@ -235,19 +234,36 @@ void init(struct thrarg *arg)
 	ring_reset(R);
 }
 
+void usage()
+{
+	fprintf(stderr, "Usage:\n\tring [ <size> ]\n");
+}
+
 int main(int argc, char **argv)
 {
 	unsigned nthreads = 2;
-	(void)argc; (void)argv;
 
-	R = ring_new(RING_LEN);
+	unsigned len = RING_LEN;
+
+	if (argc == 2 && sscanf(argv[1],"%u", &len) != 1) {
+		usage();
+		return 1;
+	}
+
+	if (argc > 2) {
+		usage();
+		return 1;
+	}
+
+	R = ring_new(len);
 
 	struct thrarg thrarg = { .params = {
 		.threads = nthreads,
 		.benchmark = benchmark_ping,
 		.init = init,
-		.min_time =  100*1000*1000,
+		.min_time =  100*1000,
 		.max_samples =  30,
+		.max_error = 10,
 		.iters = 10,
 	}};
 

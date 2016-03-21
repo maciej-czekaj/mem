@@ -4,6 +4,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <sched.h>
+
 #include "bench.h"
 
 #define assert(x) if(__builtin_expect((x), 0)) __builtin_trap()
@@ -15,6 +17,9 @@
 		} \
 	} while (0)
 
+#define RING_LEN 32
+#define WITH_LOCK
+#define EXCLUSIVE true
 
 struct message
 {
@@ -29,77 +34,149 @@ struct ring {
 	unsigned sent;
 	void *cache3[0] __attribute__((aligned(64)));
 	unsigned len;
-	struct message messages[RING_LEN];
-}__attribute__((aligned(64))) Ring;
+	struct message messages[0];
+}__attribute__((aligned(64))) *R;
 
 
+//#define CAS
 
-static bool mbox_lock(struct mbox *mbx)
+static void lock(unsigned *lock)
 {
-#if 0
-	unsigned lock = 0;
+#ifdef CAS
+	unsigned lock_val = 0;
 	while(!__atomic_compare_exchange_n(
-				&mbx->lock, &lock, 1, false,
+				lock, &lock_val, 1, false,
 				__ATOMIC_ACQUIRE, __ATOMIC_RELAXED))
-		while ((lock = __atomic_load_n(&mbx->lock, __ATOMIC_ACQUIRE)) != 0)
+		while ((lock_val = __atomic_load_n(lock, __ATOMIC_ACQUIRE)) != 0)
 			;
 #else
-	while (__atomic_test_and_set(&mbx->lock, __ATOMIC_ACQUIRE))
-		while ((__atomic_load_n(&mbx->lock, __ATOMIC_ACQUIRE)) != 0)
+	do {
+		while ((__atomic_load_n(lock, __ATOMIC_RELAXED)) != 0)
 			;
-#endif
-	return true;
-}
-
-static void mbox_unlock(struct mbox *mbx)
-{
-	assert_eq(mbx->lock, 1);
-#if 0
-//	__atomic_store_n(&mbx->lock, 0, __ATOMIC_RELEASE);
-#else
-	__atomic_clear(&mbx->lock,__ATOMIC_RELEASE);
+			//sched_yield();
+	} while (__atomic_test_and_set(lock, __ATOMIC_ACQUIRE));
 #endif
 }
 
-
-bool ring_send(struct ring *r, size_t n, struct message msg[n])
+static void unlock(unsigned *lock)
 {
-	bool success = false;
-	unsigned received, sent, len, space;
+	assert_eq(*lock, 1);
+#ifdef CAS
+	__atomic_store_n(lock, 0, __ATOMIC_RELEASE);
+#else
+	__atomic_clear(lock,__ATOMIC_RELEASE);
+#endif
+}
+
+#ifdef WITH_LOCK
+static bool ring_send(struct ring *r, size_t n, struct message msg[n], bool excl)
+{
+	unsigned received, sent, len, space, mask;
+
+	if (excl)
+		lock(&r->lock);
 
 	sent = r->sent;
 	len = r->len;
+	mask = len - 1;
+	if (excl)
+		received = r->received;
+	else
+		received  = __atomic_load_n(&r->received, __ATOMIC_ACQUIRE);
+	space = sent - received + n;
+	if (space > len) {
+		if (excl)
+			unlock(&r->lock);
+		return false;
+	}
+	for (size_t i = 0; i < n; i++)
+		r->messages[(sent+i) & mask] = msg[i];
+
+	if (excl) {
+		r->sent += n;
+		unlock(&r->lock);
+	}
+	else {
+		__atomic_store_n(&r->sent, sent + n, __ATOMIC_RELEASE);
+	}
+	return true;
+}
+
+
+bool ring_receive(struct ring *r, size_t n, struct message msg[n], bool excl)
+{
+	unsigned received, sent, len, space, mask;
+
+	if (excl)
+		lock(&r->lock);
+	received = r->received;
+	len = r->len;
+	mask = len - 1;
+	if (excl)
+		sent = r->sent;
+	else
+		sent = __atomic_load_n(&r->sent, __ATOMIC_ACQUIRE);
+	space = sent - received;
+	if (space < n) {
+		if (excl)
+			unlock(&r->lock);
+		return false;
+	}
+
+	for (size_t i = 0; i < n; i++)
+		msg[i] = r->messages[(received+i) & mask];
+
+	if (excl) {
+		r->received += n;
+		unlock(&r->lock);
+	} else {
+		__atomic_store_n(&r->received, received + n, __ATOMIC_RELEASE);
+	}
+	return true;
+}
+
+#else
+bool ring_send(struct ring *r, size_t n, struct message msg[n])
+{
+	unsigned received, sent, len, space, mask;
+
+	sent = r->sent;
+	len = r->len;
+	mask = len - 1;
 	received  = __atomic_load_n(&r->received, __ATOMIC_ACQUIRE);
 	space = sent - received + n;
 	if (space > len)
 		return false;
 
-	}
-	
 	for (size_t i = 0; i < n; i++)
-		r->messages[(sent+i) & len] = msg[i];
+		r->messages[(sent+i) & mask] = msg[i];
 
-	__atomic_store_n(&r->sent, space, __ATOMIC_RELEASE);
+	__atomic_store_n(&r->sent, sent + n, __ATOMIC_RELEASE);
 
 	return true;
 }
 
 
-bool mbox_receive(struct mbox *mbx, struct message *msg)
+bool ring_receive(struct ring *r, size_t n, struct message msg[n])
 {
-	bool success = false;
+	unsigned received, sent, len, space, mask;
 
-	if (mbox_lock(mbx)) {
-		assert_eq(mbx->lock,1);
-		if (mbx->sent > mbx->received) {
-			*msg = mbx->message;
-			mbx->received++;
-			success = true;
-		}
-		mbox_unlock(mbx);
-	}
-	return success;
+	received = r->received;
+	len = r->len;
+	mask = len - 1;
+	sent  = __atomic_load_n(&r->sent, __ATOMIC_ACQUIRE);
+	space = sent - received;
+	if (space < n)
+		return false;
+
+	for (size_t i = 0; i < n; i++)
+		msg[i] = r->messages[(received+i) & mask];
+
+	__atomic_store_n(&r->received, received + n, __ATOMIC_RELEASE);
+
+	return true;
 }
+#endif
 
 void send(size_t n)
 {
@@ -107,12 +184,9 @@ void send(size_t n)
 
 	for (size_t i = 0; i < n; i++) {
 		msg.count = i;
-		while (!mbox_send(&A, &msg))
+		while (!ring_send(R, 1, &msg, EXCLUSIVE))
 			;
-		while (!mbox_receive(&B, &msg))
-			;
-		assert_eq(msg.count,i);
-		printf("%zu\n", i);
+		//printf("%zu\n", i);
 	}
 }
 
@@ -121,12 +195,10 @@ void recv(size_t n)
 	struct message msg;
 
 	for (size_t i = 0; i < n; i++) {
-		while (!mbox_receive(&A, &msg))
+		while (!ring_receive(R, 1, &msg, EXCLUSIVE))
 			;
 		assert_eq(msg.count,i);
-		printf("%zu\n", i);
-		while (!mbox_send(&B, &msg))
-			;
+		//printf("%zu\n", i);
 	}
 }
 
@@ -138,12 +210,29 @@ void benchmark_ping(struct thrarg *arg)
 		recv(arg->params.iters);
 }
 
+void ring_reset(struct ring *r)
+{
+	r->sent = 0;
+	r->received = 0;
+	r->lock = 0;
+}
+
+struct ring *ring_new(size_t ring_len)
+{
+	struct ring *r = NULL;
+	if (posix_memalign((void **)&r, 64, sizeof(struct ring) + ring_len * sizeof(struct message))) {
+		perror("posix_memalign");
+		exit(1);
+	}
+	ring_reset(r);
+	r->len = ring_len;
+	return r;
+}
+
 void init(struct thrarg *arg)
 {
 	(void)arg;
-	memset(mbox, 0, sizeof(struct mbox));
-	memset(&A, 0, sizeof(struct mbox));
-	memset(&B, 0, sizeof(struct mbox));
+	ring_reset(R);
 }
 
 int main(int argc, char **argv)
@@ -151,24 +240,19 @@ int main(int argc, char **argv)
 	unsigned nthreads = 2;
 	(void)argc; (void)argv;
 
-	if (posix_memalign((void **)&mbox, 64, sizeof(struct mbox))) {
-		perror("posix_memalign");
-		return 1;
-	}
-
-	memset(mbox, 0, sizeof(struct mbox));
+	R = ring_new(RING_LEN);
 
 	struct thrarg thrarg = { .params = {
 		.threads = nthreads,
 		.benchmark = benchmark_ping,
 		.init = init,
-		.min_time =  10*1000,
-		.max_samples =  10,
+		.min_time =  100*1000*1000,
+		.max_samples =  30,
 		.iters = 10,
 	}};
 
-//	int err = benchmark_auto(&thrarg);
-	int err = benchmark_once(&thrarg);
+	int err = benchmark_auto(&thrarg);
+//	int err = benchmark_once(&thrarg);
 	if (err < 0) {
 		fprintf(stderr, "Bench error %s\n", strerror(err));
 		return 1;

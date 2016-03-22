@@ -91,6 +91,8 @@ static void barrier_wait(uint32_t *barrier)
 	uint32_t val = __atomic_sub_fetch(barrier, 1, __ATOMIC_RELAXED);
 	while (val != 0)
 		val = __atomic_load_n(barrier, __ATOMIC_RELAXED);
+
+	__atomic_thread_fence(__ATOMIC_SEQ_CST);
 }
 
 static void *thread(void *arg)

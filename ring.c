@@ -83,9 +83,9 @@ void send(size_t n, size_t k)
 {
 	struct message msg[k];
 
-	for (size_t i = 0; i < n; i++) {
+	for (size_t i = 0; i < n/k; i++) {
 		for (size_t j = 0; j < k; j++)
-			msg[j].count = i;
+			msg[j].count = i*k + j;
 		while (!ring_send(R, k, msg))
 			;
 	}
@@ -95,10 +95,10 @@ void recv(size_t n, size_t k)
 {
 	struct message msg[k];
 
-	for (size_t i = 0; i < n; i++) {
+	for (size_t i = 0; i < n/k; i++) {
 		while (!ring_receive(R, k, msg))
 			;
-		assert(msg[0].count == i);
+		assert(msg[0].count == i*k);
 	}
 }
 
@@ -235,7 +235,6 @@ void init(struct thrarg *arg)
 {
 	(void)arg;
 	ring_reset(R);
-	__atomic_thread_fence(__ATOMIC_SEQ_CST);
 }
 
 void usage()

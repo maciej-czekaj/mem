@@ -79,25 +79,26 @@ bool ring_receive(struct ring *r, size_t n, struct message msg[n])
 }
 #endif
 
-void send(size_t n)
+void send(size_t n, size_t k)
 {
-	struct message msg = {.count = 0};
+	struct message msg[k];
 
 	for (size_t i = 0; i < n; i++) {
-		msg.count = i;
-		while (!ring_send(R, 1, &msg))
+		for (size_t j = 0; j < k; j++)
+			msg[j].count = i;
+		while (!ring_send(R, k, msg))
 			;
 	}
 }
 
-void recv(size_t n)
+void recv(size_t n, size_t k)
 {
-	struct message msg;
+	struct message msg[k];
 
 	for (size_t i = 0; i < n; i++) {
-		while (!ring_receive(R, 1, &msg))
+		while (!ring_receive(R, k, msg))
 			;
-		assert(msg.count == i);
+		assert(msg[0].count == i);
 	}
 }
 
@@ -199,13 +200,14 @@ bool ring_receive(struct ring *r, size_t n, struct message msg[n], bool excl)
 
 #endif
 
+size_t K = 1;
 
 void benchmark_ping(struct thrarg *arg)
 {
 	if (arg->params.id)
-		send(arg->params.iters);
+		send(arg->params.iters, K);
 	else
-		recv(arg->params.iters);
+		recv(arg->params.iters, K);
 }
 
 void ring_reset(struct ring *r)
@@ -238,7 +240,7 @@ void init(struct thrarg *arg)
 
 void usage()
 {
-	fprintf(stderr, "Usage:\n\tring [ <size> ]\n");
+	fprintf(stderr, "Usage:\n\tring  <burst> <size>\n");
 }
 
 int main(int argc, char **argv)
@@ -247,12 +249,17 @@ int main(int argc, char **argv)
 
 	unsigned len = RING_LEN;
 
-	if (argc == 2 && sscanf(argv[1],"%u", &len) != 1) {
+	if (argc != 3) {
 		usage();
 		return 1;
 	}
 
-	if (argc > 2) {
+	if (sscanf(argv[1],"%u", &len) != 1) {
+		usage();
+		return 1;
+	}
+
+	if (sscanf(argv[2],"%zu", &K) != 1) {
 		usage();
 		return 1;
 	}
